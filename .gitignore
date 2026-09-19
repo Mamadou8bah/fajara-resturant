@@ -1,0 +1,81 @@
+# --- Dependencies ---
+node_modules/
+.pnpm-store/
+
+# --- Builds / caches ---
+dist/
+build/
+out/
+.next/
+.turbo/
+.cache/
+*.tsbuildinfo
+
+# --- Env & secrets (commit only *.example templates) ---
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Neon CLI local link context
+.neon
+.neon/
+
+# --- Runtime / uploads / DB dumps ---
+uploads/
+tmp/
+temp/
+backups/
+*.dump
+*.sql.gz
+*.pem
+*.key
+*.p12
+
+# --- Logs & coverage ---
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+coverage/
+.nyc_output/
+
+# --- Test / tooling artifacts ---
+playwright-report/
+test-results/
+.eslintcache
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- Editors / IDEs (local only) ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.code-workspace
+
+# --- AI agents / Cursor / Neon agent tooling (local only) ---
+.cursor/
+.agents/
+skills-lock.json
+AGENTS.md
+CLAUDE.md
+.claude/
+.codex/
+.continue/
+.windsurf/
+.mcp.json
+**/mcp.json
+
+# --- Confidential / local-only docs (do not publish) ---
+docs/srs.txt
+docs/private/
+docs/**/*.secret.*
+docs/**/*credentials*
+docs/**/*-secrets*

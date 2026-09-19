@@ -1,0 +1,52 @@
+# Render Blueprint — Fajara API (staging)
+# https://render.com/docs/blueprint-spec
+#
+# Independent app: this file lives with the API.
+#
+# Monorepo: set Blueprint path to `server/render.yaml` (or Root Directory = server
+# and use this file as `render.yaml` after splitting the repo).
+# Standalone repo: keep this file at the repository root (rename/move as needed).
+#
+# Dashboard: set DATABASE_URL (Neon pooled), SEED_OWNER_PASSWORD, and after the
+# web app is live set CORS_ORIGIN + PUBLIC_WEB_URL to the Netlify origin.
+#
+# Each deploy runs migrate + seed (seed is upsert-based / idempotent for staging).
+
+services:
+  - type: web
+    name: fajara-api-staging
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    # Paid plans only — runs after build, before traffic switches.
+    preDeployCommand: pnpm migrate:deploy && pnpm seed
+    startCommand: pnpm start:prod
+    healthCheckPath: /api/health
+    envVars:
+      - key: APP_ENV
+        value: staging
+      - key: NODE_ENV
+        value: production
+      # Neon pooled URL (do not commit). Paste in Render → Environment.
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      # Web app origin(s) — set after Netlify (or other host) exists:
+      - key: CORS_ORIGIN
+        sync: false
+      - key: PUBLIC_WEB_URL
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: SEED_PIN
+        value: "1234"
+      - key: SEED_OWNER_PASSWORD
+        sync: false

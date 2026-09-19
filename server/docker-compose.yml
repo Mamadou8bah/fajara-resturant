@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fajara-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: fajara
+      POSTGRES_PASSWORD: fajara
+      POSTGRES_DB: fajara
+    volumes:
+      - fajara_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fajara -d fajara"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  fajara_pg_data:

@@ -1,0 +1,48 @@
+# Scheduled database backup (BKP-001).
+# Requires repository secret: DATABASE_URL
+#
+# Artifacts retained 14 days. For production, prefer scripts/backup-db.sh on the
+# DB host with copies to object storage (docs/backup-restore.md).
+
+name: Database backup
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require DATABASE_URL
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "Set repository secret DATABASE_URL to enable backups."
+            exit 1
+          fi
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Run dump
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BACKUP_DIR: ${{ github.workspace }}/backups
+          RETENTION_DAYS: '14'
+        run: |
+          chmod +x scripts/backup-db.sh
+          ./scripts/backup-db.sh
+
+      - name: Upload dump artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fajara-db-backup-${{ github.run_id }}
+          path: backups/fajara-*.dump*
+          retention-days: 14

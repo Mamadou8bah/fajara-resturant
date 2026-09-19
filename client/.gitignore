@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# Env & secrets (keep *.example)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Hosting CLI
+.netlify/
+.vercel/
+
+# AI agents (local only)
+.cursor/
+.agents/

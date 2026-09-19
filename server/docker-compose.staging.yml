@@ -1,0 +1,21 @@
+services:
+  postgres_staging:
+    image: postgres:16-alpine
+    container_name: fajara-postgres-staging
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: fajara_stg
+      POSTGRES_PASSWORD: fajara_stg
+      POSTGRES_DB: fajara_staging
+    volumes:
+      - fajara_pg_staging_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fajara_stg -d fajara_staging"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  fajara_pg_staging_data:
