@@ -79,3 +79,12 @@ docs/private/
 docs/**/*.secret.*
 docs/**/*credentials*
 docs/**/*-secrets*
+
+# LaTeX build artifacts (if ever compiled outside private/)
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz

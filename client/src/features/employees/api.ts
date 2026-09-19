@@ -57,6 +57,12 @@ export type EmployeePerformance = {
   attributedSales: number;
   averageOrderValue: number;
   tips: number;
+  checkoutCount: number;
+  checkoutSales: number;
+  checkoutTips: number;
+  voidCount: number;
+  series: { date: string; sales: number; orders: number; checkout: number }[];
+  insights: { id: string; title: string; detail: string }[];
 };
 
 export type ShiftRow = {

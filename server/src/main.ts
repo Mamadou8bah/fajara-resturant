@@ -4,7 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { AppModule } from './app.module';
-import { assertEnvironmentSafe, resolveAppEnv } from './common/env';
+import { assertEnvironmentSafe, corsOrigins, resolveAppEnv } from './common/env';
 import { RequestIdMiddleware } from './common/request-id.middleware';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
@@ -40,9 +40,8 @@ async function bootstrap() {
     }),
   );
 
-  const origin = process.env.CORS_ORIGIN ?? 'http://localhost:3000';
   app.enableCors({
-    origin: origin.split(',').map((o) => o.trim()),
+    origin: corsOrigins(),
     credentials: true,
   });
 

@@ -8,6 +8,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -51,6 +52,7 @@ import {
   fetchMargins,
   fetchSalesHistory,
   fetchSalesTrend,
+  fetchStaffPerformance,
   fetchYieldVariance,
   type ActivityItem,
   type CashierSummary,
@@ -58,10 +60,18 @@ import {
   type MarginsReport,
   type SalesHistoryItem,
   type SalesTrend,
+  type StaffPerformanceReport,
   type YieldVarianceReport,
 } from './api';
 
-type Tab = 'overview' | 'sales' | 'eod' | 'margins' | 'yield' | 'activity';
+type Tab =
+  | 'overview'
+  | 'sales'
+  | 'staff'
+  | 'eod'
+  | 'margins'
+  | 'yield'
+  | 'activity';
 
 const CHART = {
   cta: '#C0613D',
@@ -171,6 +181,9 @@ export function ReportsScreen({
   const [yieldReport, setYieldReport] = useState<YieldVarianceReport | null>(
     null,
   );
+  const [staffPerf, setStaffPerf] = useState<StaffPerformanceReport | null>(
+    null,
+  );
   const [activity, setActivity] = useState<ActivityItem[]>([]);
 
   const load = useCallback(async (opts?: { quiet?: boolean }) => {
@@ -223,6 +236,8 @@ export function ReportsScreen({
         setMargins(await fetchMargins(from, to));
       } else if (tab === 'yield') {
         setYieldReport(await fetchYieldVariance(from, to));
+      } else if (tab === 'staff') {
+        setStaffPerf(await fetchStaffPerformance(from, to));
       } else {
         const res = await fetchActivity({
           from,
@@ -337,13 +352,30 @@ export function ReportsScreen({
     [margins],
   );
 
+  const staffBars = useMemo(
+    () =>
+      (staffPerf?.staff ?? []).slice(0, 10).map((s) => ({
+        name: s.fullName.split(/\s+/)[0] || s.fullName,
+        fullName: s.fullName,
+        floor: s.attributedSales,
+        checkout: s.checkoutSales,
+      })),
+    [staffPerf],
+  );
+
   const tabs: {
     id: Tab;
     label: string;
-    anyOf: ('reports.view' | 'sales_history.view' | 'activity_log.view')[];
+    anyOf: (
+      | 'reports.view'
+      | 'sales_history.view'
+      | 'activity_log.view'
+      | 'employees.manage'
+    )[];
   }[] = [
     { id: 'overview', label: 'Overview', anyOf: ['reports.view', 'sales_history.view'] },
     { id: 'sales', label: 'Sales history', anyOf: ['sales_history.view'] },
+    { id: 'staff', label: 'Staff', anyOf: ['reports.view', 'employees.manage'] },
     { id: 'eod', label: 'End of day', anyOf: ['reports.view'] },
     { id: 'margins', label: 'Margins', anyOf: ['reports.view'] },
     { id: 'yield', label: 'Yield', anyOf: ['reports.view'] },
@@ -1205,6 +1237,224 @@ export function ReportsScreen({
                             ? ` (${b.variancePercent}%)`
                             : ''}
                         </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </Can>
+      ) : tab === 'staff' ? (
+        <Can
+          anyOf={['reports.view', 'employees.manage']}
+          fallback={<EmptyState title="Staff performance is restricted" />}
+        >
+          {!staffPerf ? (
+            <EmptyState title="No staff performance data" />
+          ) : (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <KpiCard
+                  label="Active staff"
+                  value={String(staffPerf.summary.activeStaff)}
+                />
+                <KpiCard
+                  label="Floor sales"
+                  value={formatGmd(staffPerf.summary.teamFloorSales)}
+                />
+                <KpiCard
+                  label="Checkout sales"
+                  value={formatGmd(staffPerf.summary.teamCheckoutSales)}
+                />
+                <KpiCard
+                  label="Tips collected"
+                  value={formatGmd(staffPerf.summary.teamTips)}
+                />
+              </div>
+
+              {staffPerf.insights.length > 0 ? (
+                <div className="grid gap-2 md:grid-cols-2">
+                  {staffPerf.insights.map((ins) => (
+                    <Panel key={ins.id} className="p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                        {ins.title}
+                      </p>
+                      <p className="mt-1 text-sm text-ink">{ins.detail}</p>
+                    </Panel>
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Panel className="p-4">
+                  <h2 className="font-display text-xl font-bold">
+                    Sales by staff
+                  </h2>
+                  <p className="mt-0.5 text-xs text-muted">
+                    Floor (waiter) vs checkout (cashier) in range
+                  </p>
+                  {staffBars.length === 0 ? (
+                    <EmptyState title="No staff sales in this range" />
+                  ) : (
+                    <div className="mt-3 h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={staffBars} margin={{ left: 4, right: 8 }}>
+                          <CartesianGrid stroke={CHART.grid} vertical={false} />
+                          <XAxis
+                            dataKey="name"
+                            tick={{ fill: CHART.muted, fontSize: 11 }}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis
+                            tick={{ fill: CHART.muted, fontSize: 11 }}
+                            axisLine={false}
+                            tickLine={false}
+                            width={56}
+                            tickFormatter={(v) =>
+                              v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)
+                            }
+                          />
+                          <Tooltip content={<ChartTooltip />} />
+                          <Legend />
+                          <Bar
+                            dataKey="floor"
+                            name="Floor"
+                            fill={CHART.cta}
+                            radius={[6, 6, 0, 0]}
+                          />
+                          <Bar
+                            dataKey="checkout"
+                            name="Checkout"
+                            fill={CHART.ready}
+                            radius={[6, 6, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </Panel>
+
+                <Panel className="p-4">
+                  <h2 className="font-display text-xl font-bold">
+                    Daily team trend
+                  </h2>
+                  <p className="mt-0.5 text-xs text-muted">
+                    Floor and checkout totals by day
+                  </p>
+                  {(staffPerf.daily?.length ?? 0) === 0 ? (
+                    <EmptyState title="No daily activity yet" />
+                  ) : (
+                    <div className="mt-3 h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={staffPerf.daily}>
+                          <defs>
+                            <linearGradient
+                              id="staffFloorFill"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="0%"
+                                stopColor={CHART.cta}
+                                stopOpacity={0.35}
+                              />
+                              <stop
+                                offset="100%"
+                                stopColor={CHART.cta}
+                                stopOpacity={0.02}
+                              />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid stroke={CHART.grid} vertical={false} />
+                          <XAxis
+                            dataKey="date"
+                            tick={{ fill: CHART.muted, fontSize: 11 }}
+                            axisLine={false}
+                            tickLine={false}
+                            tickFormatter={(d) =>
+                              String(d).slice(5).replace('-', '/')
+                            }
+                          />
+                          <YAxis
+                            tick={{ fill: CHART.muted, fontSize: 11 }}
+                            axisLine={false}
+                            tickLine={false}
+                            width={56}
+                            tickFormatter={(v) =>
+                              v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)
+                            }
+                          />
+                          <Tooltip content={<ChartTooltip />} />
+                          <Legend />
+                          <Area
+                            type="monotone"
+                            dataKey="floorSales"
+                            name="Floor"
+                            stroke={CHART.cta}
+                            fill="url(#staffFloorFill)"
+                            strokeWidth={2}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="checkoutSales"
+                            name="Checkout"
+                            stroke={CHART.ready}
+                            fill="transparent"
+                            strokeWidth={2}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </Panel>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-[#E0D5C4] bg-white">
+                <table className="w-full min-w-[760px] text-left text-sm">
+                  <thead className="border-b border-[#E0D5C4] text-xs uppercase tracking-wide text-muted">
+                    <tr>
+                      <th className="px-4 py-3">Staff</th>
+                      <th className="px-4 py-3">Orders</th>
+                      <th className="px-4 py-3">Floor sales</th>
+                      <th className="px-4 py-3">AOV</th>
+                      <th className="px-4 py-3">Checkouts</th>
+                      <th className="px-4 py-3">Checkout sales</th>
+                      <th className="px-4 py-3">Tips</th>
+                      <th className="px-4 py-3">Voids</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {staffPerf.staff.map((s) => (
+                      <tr
+                        key={s.employeeId}
+                        className="border-b border-[#EDE6DA]"
+                      >
+                        <td className="px-4 py-3 font-medium">
+                          {s.fullName}
+                          <span className="mt-0.5 block text-xs font-normal text-muted">
+                            {humanizeRole(s.role)}
+                            {s.designation ? ` · ${s.designation}` : ''}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">{s.orderCount}</td>
+                        <td className="px-4 py-3">
+                          {formatGmd(s.attributedSales)}
+                        </td>
+                        <td className="px-4 py-3">
+                          {formatGmd(s.averageOrderValue)}
+                        </td>
+                        <td className="px-4 py-3">{s.checkoutCount}</td>
+                        <td className="px-4 py-3">
+                          {formatGmd(s.checkoutSales)}
+                        </td>
+                        <td className="px-4 py-3">
+                          {formatGmd(s.checkoutTips)}
+                        </td>
+                        <td className="px-4 py-3">{s.voidCount}</td>
                       </tr>
                     ))}
                   </tbody>

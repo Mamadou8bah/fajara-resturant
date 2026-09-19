@@ -148,24 +148,127 @@ export class EmployeesService {
 
     const orderCount = orders.length;
     let attributedSales = 0;
+    const dailyMap = new Map<
+      string,
+      { date: string; sales: number; orders: number; checkout: number }
+    >();
+
     for (const order of orders) {
+      let sale = 0;
       for (const item of order.items) {
         const unit = Number(item.priceSnapshot);
-        attributedSales += unit * item.quantity;
+        sale += unit * item.quantity;
       }
+      attributedSales += sale;
+      const date = order.submittedAt.toISOString().slice(0, 10);
+      const cur = dailyMap.get(date) ?? {
+        date,
+        sales: 0,
+        orders: 0,
+        checkout: 0,
+      };
+      cur.sales += sale;
+      cur.orders += 1;
+      dailyMap.set(date, cur);
     }
 
     const sessionIds = [...new Set(orders.map((o) => o.sessionId))];
-    const tipAgg = await this.prisma.transaction.aggregate({
+    const tipAgg =
+      sessionIds.length === 0
+        ? { _sum: { tipAmount: null as number | null } }
+        : await this.prisma.transaction.aggregate({
+            where: {
+              sessionId: { in: sessionIds },
+              createdAt: { gte: start, lt: end },
+              status: 'completed',
+            },
+            _sum: { tipAmount: true },
+          });
+    const tips = Number(tipAgg._sum.tipAmount ?? 0);
+    const aov = orderCount ? attributedSales / orderCount : 0;
+
+    const cashierTx = await this.prisma.transaction.findMany({
       where: {
-        sessionId: { in: sessionIds },
+        cashierId: id,
         createdAt: { gte: start, lt: end },
         status: 'completed',
       },
-      _sum: { tipAmount: true },
+      select: { total: true, tipAmount: true, createdAt: true },
     });
-    const tips = Number(tipAgg._sum.tipAmount ?? 0);
-    const aov = orderCount ? attributedSales / orderCount : 0;
+    let checkoutSales = 0;
+    let checkoutTips = 0;
+    for (const tx of cashierTx) {
+      checkoutSales += Number(tx.total);
+      checkoutTips += Number(tx.tipAmount);
+      const date = tx.createdAt.toISOString().slice(0, 10);
+      const cur = dailyMap.get(date) ?? {
+        date,
+        sales: 0,
+        orders: 0,
+        checkout: 0,
+      };
+      cur.checkout += Number(tx.total);
+      dailyMap.set(date, cur);
+    }
+
+    const voidCount = await this.prisma.orderException.count({
+      where: {
+        actorId: id,
+        type: 'void',
+        createdAt: { gte: start, lt: end },
+      },
+    });
+
+    const round2 = (v: number) => Math.round(v * 100) / 100;
+    const series = [...dailyMap.values()]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((d) => ({
+        date: d.date,
+        sales: round2(d.sales),
+        orders: d.orders,
+        checkout: round2(d.checkout),
+      }));
+
+    const insights: { id: string; title: string; detail: string }[] = [];
+    if (orderCount === 0 && cashierTx.length === 0) {
+      insights.push({
+        id: 'quiet',
+        title: 'Quiet period',
+        detail: 'No floor orders or checkout activity in this range.',
+      });
+    } else {
+      if (orderCount > 0) {
+        insights.push({
+          id: 'floor',
+          title: 'Floor contribution',
+          detail: `${orderCount} orders · ${round2(attributedSales).toFixed(0)} attributed sales · AOV ${round2(aov).toFixed(0)}.`,
+        });
+      }
+      if (cashierTx.length > 0) {
+        insights.push({
+          id: 'checkout',
+          title: 'Checkout contribution',
+          detail: `${cashierTx.length} settlements · ${round2(checkoutSales).toFixed(0)} net · ${round2(checkoutTips).toFixed(0)} tips.`,
+        });
+      }
+      if (voidCount > 0) {
+        insights.push({
+          id: 'voids',
+          title: 'Voids',
+          detail: `${voidCount} void action${voidCount === 1 ? '' : 's'} in range.`,
+        });
+      }
+      const peak = [...series].sort(
+        (a, b) => b.sales + b.checkout - (a.sales + a.checkout),
+      )[0];
+      if (peak && peak.sales + peak.checkout > 0) {
+        insights.push({
+          id: 'peak',
+          title: 'Busiest day',
+          detail: `${peak.date}: ${round2(peak.sales + peak.checkout).toFixed(0)} combined floor + checkout.`,
+        });
+      }
+    }
 
     return {
       employeeId: id,
@@ -174,9 +277,15 @@ export class EmployeesService {
       from,
       to,
       orderCount,
-      attributedSales: Math.round(attributedSales * 100) / 100,
-      averageOrderValue: Math.round(aov * 100) / 100,
-      tips: Math.round(tips * 100) / 100,
+      attributedSales: round2(attributedSales),
+      averageOrderValue: round2(aov),
+      tips: round2(tips),
+      checkoutCount: cashierTx.length,
+      checkoutSales: round2(checkoutSales),
+      checkoutTips: round2(checkoutTips),
+      voidCount,
+      series,
+      insights,
     };
   }
 

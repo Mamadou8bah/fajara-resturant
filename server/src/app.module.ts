@@ -31,6 +31,7 @@ import { ShiftsModule } from './shifts/shifts.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { TablesModule } from './tables/tables.module';
 import { TillModule } from './till/till.module';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
@@ -76,6 +77,7 @@ import { TillModule } from './till/till.module';
     PayrollModule,
     ReportsModule,
     RetentionModule,
+    UploadsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

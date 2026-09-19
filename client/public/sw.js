@@ -1,7 +1,7 @@
 /* Offline-first shell + guest browse cache. Read-only — no write queue. */
-const SHELL_CACHE = 'fajara-shell-v2';
+const SHELL_CACHE = 'fajara-shell-v3';
 const MENU_CACHE = 'fajara-guest-menu-v1';
-const SHELL = ['/', '/app/login', '/manifest.webmanifest'];
+const SHELL = ['/', '/app/login'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -40,6 +40,16 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
+
+  // Dynamic branded manifest — always prefer network.
+  if (url.pathname.endsWith('manifest.webmanifest')) {
+    event.respondWith(
+      fetch(req).catch(() =>
+        caches.match(req).then((r) => r || Response.error()),
+      ),
+    );
+    return;
+  }
 
   // Cache-first for guest menu / public settings (offline browse).
   if (isGuestMenuApi(url)) {

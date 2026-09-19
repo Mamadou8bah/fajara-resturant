@@ -52,6 +52,12 @@ export class ReportsController {
     return this.reports.cashierSummary(query, user);
   }
 
+  @Get('staff-performance')
+  @RequirePermissions('reports.view', 'employees.manage')
+  staffPerformance(@Query() query: DateRangeQueryDto) {
+    return this.reports.staffPerformance(query);
+  }
+
   @Get('end-of-day')
   @RequirePermissions('reports.view')
   endOfDay(@Query() query: EndOfDayQueryDto) {

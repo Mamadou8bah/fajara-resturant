@@ -16,6 +16,7 @@ import { useAuth } from '@/lib/auth';
 import { Can, useCan } from '@/lib/rbac';
 import type { Role } from '@/lib/rbac/permissions';
 import { ShiftPlanner } from './ShiftPlanner';
+import { EmployeePerformancePanels } from './EmployeePerformancePanels';
 import {
   archiveEmployee,
   createEmployee,
@@ -753,32 +754,7 @@ export function EmployeesScreen({
                     </Button>
                   </div>
                   {perf ? (
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                      <div className="rounded-xl bg-[#EDE6DA] p-3">
-                        <p className="text-xs text-muted">Orders handled</p>
-                        <p className="font-display text-xl font-bold">
-                          {perf.orderCount}
-                        </p>
-                      </div>
-                      <div className="rounded-xl bg-[#EDE6DA] p-3">
-                        <p className="text-xs text-muted">Sales attributed</p>
-                        <p className="font-display text-xl font-bold">
-                          {formatGmd(perf.attributedSales)}
-                        </p>
-                      </div>
-                      <div className="rounded-xl bg-[#EDE6DA] p-3">
-                        <p className="text-xs text-muted">Avg order value</p>
-                        <p className="font-display text-xl font-bold">
-                          {formatGmd(perf.averageOrderValue)}
-                        </p>
-                      </div>
-                      <div className="rounded-xl bg-[#EDE6DA] p-3">
-                        <p className="text-xs text-muted">Tips</p>
-                        <p className="font-display text-xl font-bold">
-                          {formatGmd(perf.tips)}
-                        </p>
-                      </div>
-                    </div>
+                    <EmployeePerformancePanels perf={perf} />
                   ) : (
                     <p className="text-sm text-muted">
                       Load a range to see performance.
@@ -1161,32 +1137,7 @@ export function EmployeesScreen({
                 body="Choose dates and load attributed sales."
               />
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Panel>
-                  <p className="text-xs uppercase text-muted">Orders</p>
-                  <p className="mt-1 font-display text-2xl font-bold">
-                    {perf.orderCount}
-                  </p>
-                </Panel>
-                <Panel>
-                  <p className="text-xs uppercase text-muted">Sales</p>
-                  <p className="mt-1 font-display text-2xl font-bold">
-                    {formatGmd(perf.attributedSales)}
-                  </p>
-                </Panel>
-                <Panel>
-                  <p className="text-xs uppercase text-muted">AOV</p>
-                  <p className="mt-1 font-display text-2xl font-bold">
-                    {formatGmd(perf.averageOrderValue)}
-                  </p>
-                </Panel>
-                <Panel>
-                  <p className="text-xs uppercase text-muted">Tips</p>
-                  <p className="mt-1 font-display text-2xl font-bold">
-                    {formatGmd(perf.tips)}
-                  </p>
-                </Panel>
-              </div>
+              <EmployeePerformancePanels perf={perf} />
             )}
           </div>
         </Can>

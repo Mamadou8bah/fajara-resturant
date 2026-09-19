@@ -44,3 +44,14 @@ export function jwtSecretForEnv(appEnv: AppEnv): string {
   if (appEnv === 'development') return jwt || 'dev-only-change-me';
   throw new Error(`[${appEnv}] JWT_SECRET is required`);
 }
+
+/** Browser Origin has no trailing slash; normalize env values so both forms work. */
+export function corsOrigins(
+  raw = process.env.CORS_ORIGIN ?? 'http://localhost:3000',
+): string[] {
+  const list = raw
+    .split(',')
+    .map((o) => o.trim().replace(/\/+$/, ''))
+    .filter(Boolean);
+  return list.length > 0 ? list : ['http://localhost:3000'];
+}

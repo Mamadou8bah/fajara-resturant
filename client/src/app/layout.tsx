@@ -1,11 +1,12 @@
 import type { Metadata, Viewport } from 'next';
+import { AppIconSync } from '@/components/AppIconSync';
 import { Providers } from '@/components/Providers';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Fajara Restaurant Services',
   description: 'Restaurant management PWA for Fajara Restaurant Services',
-  manifest: '/manifest.webmanifest',
+  // Next.js serves app/manifest.ts at /manifest.webmanifest
   applicationName: 'Fajara',
   appleWebApp: {
     capable: true,
@@ -38,7 +39,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased" suppressHydrationWarning>
-        <Providers>{children}</Providers>
+        <Providers>
+          <AppIconSync />
+          {children}
+        </Providers>
       </body>
     </html>
   );

@@ -218,6 +218,46 @@ export function fetchYieldVariance(from: string, to: string) {
   );
 }
 
+export type StaffPerformanceReport = {
+  from: string;
+  to: string;
+  summary: {
+    activeStaff: number;
+    teamFloorSales: number;
+    teamCheckoutSales: number;
+    teamOrders: number;
+    teamTips: number;
+  };
+  insights: { id: string; title: string; detail: string }[];
+  daily: {
+    date: string;
+    floorSales: number;
+    checkoutSales: number;
+    orders: number;
+  }[];
+  staff: {
+    employeeId: string;
+    fullName: string;
+    role: string;
+    designation: string | null;
+    orderCount: number;
+    attributedSales: number;
+    averageOrderValue: number;
+    checkoutCount: number;
+    checkoutSales: number;
+    checkoutTips: number;
+    checkoutAov: number;
+    voidCount: number;
+    totalActivity: number;
+  }[];
+};
+
+export function fetchStaffPerformance(from: string, to: string) {
+  return api<StaffPerformanceReport>(
+    `/reports/staff-performance?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+  );
+}
+
 export function fetchActivity(params: {
   page?: number;
   pageSize?: number;

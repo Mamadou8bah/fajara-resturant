@@ -1036,6 +1036,271 @@ export class ReportsService {
     );
   }
 
+  async staffPerformance(query: DateRangeQueryDto) {
+    const { start, end } = rangeBounds(query.from, query.to);
+    const from = query.from;
+    const to = query.to;
+
+    const employees = await this.prisma.employee.findMany({
+      where: { archivedAt: null, isActive: true },
+      select: {
+        id: true,
+        fullName: true,
+        role: true,
+        designation: true,
+      },
+      orderBy: { fullName: 'asc' },
+    });
+
+    const orders = await this.prisma.order.findMany({
+      where: {
+        waiterId: { not: null },
+        submittedAt: { gte: start, lt: end },
+        status: {
+          notIn: [
+            OrderStatus.draft,
+            OrderStatus.cancelled,
+            OrderStatus.voided,
+          ],
+        },
+      },
+      select: {
+        waiterId: true,
+        submittedAt: true,
+        items: {
+          where: {
+            status: {
+              notIn: [
+                OrderItemStatus.cancelled,
+                OrderItemStatus.voided,
+                OrderItemStatus.draft,
+              ],
+            },
+          },
+          select: { priceSnapshot: true, quantity: true },
+        },
+      },
+    });
+
+    const transactions = await this.prisma.transaction.findMany({
+      where: {
+        cashierId: { not: null },
+        createdAt: { gte: start, lt: end },
+        status: 'completed',
+      },
+      select: {
+        cashierId: true,
+        total: true,
+        tipAmount: true,
+        createdAt: true,
+      },
+    });
+
+    const voids = await this.prisma.orderException.groupBy({
+      by: ['actorId'],
+      where: {
+        createdAt: { gte: start, lt: end },
+        type: 'void',
+      },
+      _count: { _all: true },
+    });
+
+    type Acc = {
+      orderCount: number;
+      attributedSales: number;
+      checkoutCount: number;
+      checkoutSales: number;
+      checkoutTips: number;
+      voidCount: number;
+    };
+    const byId = new Map<string, Acc>();
+    const ensure = (id: string): Acc => {
+      let a = byId.get(id);
+      if (!a) {
+        a = {
+          orderCount: 0,
+          attributedSales: 0,
+          checkoutCount: 0,
+          checkoutSales: 0,
+          checkoutTips: 0,
+          voidCount: 0,
+        };
+        byId.set(id, a);
+      }
+      return a;
+    };
+
+    const dailyMap = new Map<
+      string,
+      { date: string; floorSales: number; checkoutSales: number; orders: number }
+    >();
+    const bumpDay = (
+      iso: Date,
+      patch: Partial<{ floorSales: number; checkoutSales: number; orders: number }>,
+    ) => {
+      const date = iso.toISOString().slice(0, 10);
+      const cur = dailyMap.get(date) ?? {
+        date,
+        floorSales: 0,
+        checkoutSales: 0,
+        orders: 0,
+      };
+      cur.floorSales += patch.floorSales ?? 0;
+      cur.checkoutSales += patch.checkoutSales ?? 0;
+      cur.orders += patch.orders ?? 0;
+      dailyMap.set(date, cur);
+    };
+
+    for (const order of orders) {
+      if (!order.waiterId) continue;
+      const acc = ensure(order.waiterId);
+      acc.orderCount += 1;
+      let sale = 0;
+      for (const item of order.items) {
+        sale += n(item.priceSnapshot) * item.quantity;
+      }
+      acc.attributedSales += sale;
+      bumpDay(order.submittedAt, { floorSales: sale, orders: 1 });
+    }
+
+    for (const tx of transactions) {
+      if (!tx.cashierId) continue;
+      const acc = ensure(tx.cashierId);
+      acc.checkoutCount += 1;
+      acc.checkoutSales += n(tx.total);
+      acc.checkoutTips += n(tx.tipAmount);
+      bumpDay(tx.createdAt, { checkoutSales: n(tx.total) });
+    }
+
+    for (const v of voids) {
+      ensure(v.actorId).voidCount += v._count._all;
+    }
+
+    const staff = employees
+      .map((e) => {
+        const a = byId.get(e.id) ?? {
+          orderCount: 0,
+          attributedSales: 0,
+          checkoutCount: 0,
+          checkoutSales: 0,
+          checkoutTips: 0,
+          voidCount: 0,
+        };
+        const aov = a.orderCount ? a.attributedSales / a.orderCount : 0;
+        const checkoutAov = a.checkoutCount
+          ? a.checkoutSales / a.checkoutCount
+          : 0;
+        return {
+          employeeId: e.id,
+          fullName: e.fullName,
+          role: e.role,
+          designation: e.designation,
+          orderCount: a.orderCount,
+          attributedSales: round2(a.attributedSales),
+          averageOrderValue: round2(aov),
+          checkoutCount: a.checkoutCount,
+          checkoutSales: round2(a.checkoutSales),
+          checkoutTips: round2(a.checkoutTips),
+          checkoutAov: round2(checkoutAov),
+          voidCount: a.voidCount,
+          totalActivity: a.orderCount + a.checkoutCount,
+        };
+      })
+      .filter((s) => s.totalActivity > 0 || s.voidCount > 0)
+      .sort((a, b) => b.attributedSales + b.checkoutSales - (a.attributedSales + a.checkoutSales));
+
+    const daily = [...dailyMap.values()].sort((a, b) =>
+      a.date.localeCompare(b.date),
+    );
+
+    const insights: { id: string; title: string; detail: string }[] = [];
+    const topFloor = [...staff].sort(
+      (a, b) => b.attributedSales - a.attributedSales,
+    )[0];
+    const topCheckout = [...staff].sort(
+      (a, b) => b.checkoutSales - a.checkoutSales,
+    )[0];
+    const topAov = [...staff]
+      .filter((s) => s.orderCount >= 3)
+      .sort((a, b) => b.averageOrderValue - a.averageOrderValue)[0];
+    const topOrders = [...staff].sort((a, b) => b.orderCount - a.orderCount)[0];
+    const mostVoids = [...staff]
+      .filter((s) => s.voidCount > 0)
+      .sort((a, b) => b.voidCount - a.voidCount)[0];
+
+    if (topFloor && topFloor.attributedSales > 0) {
+      insights.push({
+        id: 'top-floor',
+        title: 'Top floor sales',
+        detail: `${topFloor.fullName} led waiter-attributed sales at ${round2(topFloor.attributedSales).toFixed(0)} across ${topFloor.orderCount} orders.`,
+      });
+    }
+    if (topCheckout && topCheckout.checkoutSales > 0) {
+      insights.push({
+        id: 'top-checkout',
+        title: 'Top checkout',
+        detail: `${topCheckout.fullName} settled ${round2(topCheckout.checkoutSales).toFixed(0)} over ${topCheckout.checkoutCount} transactions (${round2(topCheckout.checkoutTips).toFixed(0)} tips).`,
+      });
+    }
+    if (topAov) {
+      insights.push({
+        id: 'top-aov',
+        title: 'Highest average order',
+        detail: `${topAov.fullName} averaged ${round2(topAov.averageOrderValue).toFixed(0)} per order (${topAov.orderCount} orders).`,
+      });
+    }
+    if (topOrders && topOrders.orderCount > 0) {
+      insights.push({
+        id: 'most-orders',
+        title: 'Busiest waiter',
+        detail: `${topOrders.fullName} handled ${topOrders.orderCount} orders in this range.`,
+      });
+    }
+    if (mostVoids) {
+      insights.push({
+        id: 'voids',
+        title: 'Void activity',
+        detail: `${mostVoids.fullName} recorded ${mostVoids.voidCount} void-related actions — review if this looks high.`,
+      });
+    }
+    if (staff.length === 0) {
+      insights.push({
+        id: 'empty',
+        title: 'No staff activity',
+        detail:
+          'No waiter orders or cashier settlements in this range. Widen the dates or confirm seed/demo traffic.',
+      });
+    }
+
+    const teamFloor = round2(
+      staff.reduce((s, r) => s + r.attributedSales, 0),
+    );
+    const teamCheckout = round2(
+      staff.reduce((s, r) => s + r.checkoutSales, 0),
+    );
+    const teamOrders = staff.reduce((s, r) => s + r.orderCount, 0);
+
+    return {
+      from,
+      to,
+      summary: {
+        activeStaff: staff.length,
+        teamFloorSales: teamFloor,
+        teamCheckoutSales: teamCheckout,
+        teamOrders,
+        teamTips: round2(staff.reduce((s, r) => s + r.checkoutTips, 0)),
+      },
+      insights,
+      daily: daily.map((d) => ({
+        date: d.date,
+        floorSales: round2(d.floorSales),
+        checkoutSales: round2(d.checkoutSales),
+        orders: d.orders,
+      })),
+      staff,
+    };
+  }
+
   private exportDateWhere(
     query: ExportQueryDto,
     field: 'createdAt' = 'createdAt',

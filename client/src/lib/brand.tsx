@@ -72,22 +72,37 @@ export function useRestaurantBrand() {
   return brand;
 }
 
-/** Guest / public surfaces. */
+/** Guest / public surfaces. Refetches when brand settings change. */
 export function usePublicBrand() {
   const [brand, setBrand] = useState<RestaurantBrand>(DEFAULT_BRAND);
 
   useEffect(() => {
     let cancelled = false;
-    void api<{
-      restaurantName?: string;
-      profile?: { tradingName?: string; logoUrl?: string };
-    }>('/settings/public', { public: true })
-      .then((s) => {
-        if (!cancelled) setBrand(brandFromSettings(s));
-      })
-      .catch(() => undefined);
+
+    const load = () => {
+      void api<{
+        restaurantName?: string;
+        profile?: { tradingName?: string; logoUrl?: string };
+      }>('/settings/public', { public: true })
+        .then((s) => {
+          if (!cancelled) setBrand(brandFromSettings(s));
+        })
+        .catch(() => undefined);
+    };
+
+    load();
+
+    const onBrandChanged = () => load();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    window.addEventListener('fajara:brand-changed', onBrandChanged);
+    document.addEventListener('visibilitychange', onVisible);
+
     return () => {
       cancelled = true;
+      window.removeEventListener('fajara:brand-changed', onBrandChanged);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
 

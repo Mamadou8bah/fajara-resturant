@@ -335,6 +335,9 @@ export function SettingsScreen() {
       }
       setSaved(`${label} saved`);
       await load();
+      if (entries.some(([key]) => key === 'profile' || key === 'restaurantName')) {
+        window.dispatchEvent(new Event('fajara:brand-changed'));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed');
     } finally {
@@ -596,8 +599,9 @@ export function SettingsScreen() {
                     <div className="sm:col-span-2">
                       <p className="text-sm font-medium text-ink">Logo</p>
                       <p className="mt-0.5 text-xs text-muted">
-                        Upload a square PNG or JPG (max 5MB). Shown in staff and
-                        guest headers, login, and on receipts when enabled.
+                        Upload a square PNG or JPG (max 5MB). Used as the installed
+                        app icon, and shown in staff and guest headers, login, and
+                        on receipts when enabled.
                       </p>
                       <div className="mt-3 flex flex-wrap items-center gap-4">
                         <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-[#E0D5C4] bg-white">

@@ -245,10 +245,21 @@ function LoginForm({
           !email.trim() ||
           (mode === 'pin' ? pin.length !== 4 : password.length < 8)
         }
-        className="mt-auto min-h-[54px] w-full rounded-full bg-cta text-base font-bold text-cream transition hover:brightness-105 active:scale-[0.99] disabled:opacity-50 login-fade-up"
+        aria-busy={busy}
+        className="mt-auto flex min-h-[54px] w-full items-center justify-center gap-2 rounded-full bg-cta text-base font-bold text-cream transition hover:brightness-105 active:scale-[0.99] disabled:opacity-50 login-fade-up"
         style={{ animationDelay: '360ms' }}
       >
-        {busy ? 'Signing in…' : 'Log In'}
+        {busy ? (
+          <>
+            <span
+              className="h-4 w-4 animate-spin rounded-full border-2 border-cream/30 border-t-cream"
+              aria-hidden
+            />
+            Signing in…
+          </>
+        ) : (
+          'Log In'
+        )}
       </button>
     </form>
   );
@@ -281,6 +292,7 @@ export function LoginScreen() {
 
   useEffect(() => {
     if (loading || !user) return;
+    setBusy(true);
     router.replace(user.defaultRoute);
   }, [user, loading, router]);
 
@@ -299,10 +311,10 @@ export function LoginScreen() {
       } catch {
         /* ignore */
       }
+      // Keep loading until this screen unmounts after navigation.
       router.replace(u.defaultRoute);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-in failed');
-    } finally {
       setBusy(false);
     }
   }
