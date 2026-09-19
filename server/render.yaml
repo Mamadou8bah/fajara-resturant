@@ -18,7 +18,7 @@ services:
     runtime: node
     plan: starter
     region: oregon
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build
     # Paid plans only — runs after build, before traffic switches.
     preDeployCommand: pnpm migrate:deploy && pnpm seed
     startCommand: pnpm start:prod
@@ -28,6 +28,12 @@ services:
         value: staging
       - key: NODE_ENV
         value: production
+      # Pin Node 20 on Render (engines allows >=20 for local).
+      - key: NODE_VERSION
+        value: "20"
+      # Keep install from skipping build tools when NODE_ENV=production.
+      - key: PNPM_PRODUCTION
+        value: "false"
       # Neon pooled URL (do not commit). Paste in Render → Environment.
       - key: DATABASE_URL
         sync: false
