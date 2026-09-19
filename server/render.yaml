@@ -11,6 +11,11 @@
 # web app is live set CORS_ORIGIN + PUBLIC_WEB_URL to the Netlify origin.
 #
 # Each deploy runs migrate + seed (seed is upsert-based / idempotent for staging).
+#
+# If the service Build Command was set in the Render dashboard, sync it to:
+#   pnpm install --frozen-lockfile --prod=false && pnpm build
+# Do not use `corepack enable` on Render (EROFS on /usr/bin/pnpm).
+# (Dashboard overrides this file until you clear/sync it.)
 
 services:
   - type: web
@@ -18,7 +23,7 @@ services:
     runtime: node
     plan: starter
     region: oregon
-    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build
+    buildCommand: pnpm install --frozen-lockfile --prod=false && pnpm build
     # Paid plans only — runs after build, before traffic switches.
     preDeployCommand: pnpm migrate:deploy && pnpm seed
     startCommand: pnpm start:prod
