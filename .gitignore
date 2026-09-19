@@ -22,7 +22,10 @@ out/
 .neon/
 
 # --- Runtime / uploads / DB dumps ---
-uploads/
+# Only runtime folders — do not ignore NestJS src/uploads module
+/uploads/
+/server/uploads/
+/client/uploads/
 tmp/
 temp/
 backups/

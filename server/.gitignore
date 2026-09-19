@@ -17,8 +17,8 @@ coverage/
 .neon
 .neon/
 
-# Runtime
-uploads/
+# Runtime uploaded files (not NestJS src/uploads module)
+/uploads/
 tmp/
 backups/
 *.dump
