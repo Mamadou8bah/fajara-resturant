@@ -254,6 +254,8 @@ export type SettingsSection = {
   ownerOnly?: boolean;
   rolesManage?: boolean;
   tablesManage?: boolean;
+  /** Visible to any signed-in staff (PIN / about). */
+  always?: boolean;
 };
 
 export const SETTINGS_SECTIONS: SettingsSection[] = [
@@ -268,6 +270,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { key: 'permissions', label: 'Roles & Permissions', rolesManage: true },
   { key: 'receipt', label: 'Receipt & Printing', rolesManage: true },
   { key: 'data', label: 'Data & Export', rolesManage: true },
-  { key: 'account', label: 'Account & Security' },
-  { key: 'about', label: 'About' },
+  { key: 'account', label: 'My PIN & account', always: true },
+  { key: 'about', label: 'About', always: true },
 ];

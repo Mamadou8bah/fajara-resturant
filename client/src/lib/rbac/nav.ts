@@ -62,7 +62,12 @@ export const STAFF_NAV: NavItem[] = [
   {
     href: '/app/settings',
     label: 'Settings',
-    anyOf: ['tables.manage', 'roles.manage', 'dashboard.view'],
+    anyOf: [
+      'tables.manage',
+      'roles.manage',
+      'dashboard.view',
+      'credentials.own',
+    ],
   },
 ];
 
@@ -93,6 +98,11 @@ export const ROUTE_PERMISSIONS: { prefix: string; anyOf: Permission[] }[] = [
   { prefix: '/app/activity', anyOf: ['activity_log.view'] },
   {
     prefix: '/app/settings',
-    anyOf: ['tables.manage', 'roles.manage', 'dashboard.view'],
+    anyOf: [
+      'tables.manage',
+      'roles.manage',
+      'dashboard.view',
+      'credentials.own',
+    ],
   },
 ];

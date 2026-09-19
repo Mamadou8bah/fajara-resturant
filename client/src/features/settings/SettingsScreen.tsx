@@ -158,7 +158,9 @@ export function SettingsScreen() {
     [canConfigure, canTables, isOwner],
   );
 
-  const [section, setSection] = useState<SettingsSectionKey>('profile');
+  const [section, setSection] = useState<SettingsSectionKey>(
+    canConfigure || canTables ? 'profile' : 'account',
+  );
   const [settings, setSettings] = useState<SettingsMap | null>(null);
   const [tables, setTables] = useState<DiningTable[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -2227,7 +2229,7 @@ export function SettingsScreen() {
             {section === 'account' ? (
               <Panel>
                 <h2 className="mb-1 font-display text-lg font-bold">
-                  Account & Security
+                  My PIN & account
                 </h2>
                 <p className="mb-4 text-sm text-muted">
                   Signed in as {user?.fullName} ({user?.role}).
@@ -2242,7 +2244,10 @@ export function SettingsScreen() {
                   />
                   <p className="mt-1 text-xs text-muted">
                     Email is set when your account is created and cannot be
-                    changed here. Update PIN or password below.
+                    changed here.
+                    {user?.role === 'OWNER' || user?.role === 'MANAGER'
+                      ? ' Update your PIN or password below.'
+                      : ' Update your PIN below.'}
                   </p>
                 </Field>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
