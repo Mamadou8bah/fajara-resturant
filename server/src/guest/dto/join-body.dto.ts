@@ -21,4 +21,10 @@ export class GuestJoinBodyDto {
   @Min(1)
   @Max(50)
   partySize?: number;
+
+  /** Stable phone/browser token — one active visit per device. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  deviceToken?: string;
 }

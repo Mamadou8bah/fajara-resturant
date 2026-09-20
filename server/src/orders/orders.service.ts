@@ -1680,7 +1680,7 @@ export class OrdersService {
       throw new BadRequestException('notificationId or sessionId is required');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const assigned = await this.prisma.$transaction(async (tx) => {
       let sessionId = input.sessionId ?? null;
       let notificationId = input.notificationId ?? null;
 
@@ -1819,6 +1819,30 @@ export class OrdersService {
 
       return assigned;
     });
+
+    if (assigned?.guests?.length) {
+      const qr = await this.prisma.tableQrToken.findFirst({
+        where: { tableId: assigned.tableId, isActive: true },
+        orderBy: { createdAt: 'desc' },
+        select: { token: true },
+      });
+      const guestPath = qr?.token ? `/m/${qr.token}` : '/m';
+      const waiterName = assigned.waiter?.fullName?.split(' ')[0] || 'A waiter';
+      await Promise.all(
+        assigned.guests.map((g) =>
+          this.notifications.pushGuest({
+            type: 'order.assigned',
+            title: `${waiterName} is on the way`,
+            body: `Help is coming to table ${assigned.table.number}`,
+            guestId: g.id,
+            sessionId: assigned.id,
+            url: guestPath,
+          }),
+        ),
+      );
+    }
+
+    return assigned;
   }
 
   private async postPrepException(
@@ -2280,11 +2304,13 @@ export class OrdersService {
       },
       broadcastRoom: 'kds',
     });
+    // KDS + managers both need the ticket event for sound + refresh.
+    this.realtime.emitToRoom('kds', 'order.submitted', jsonSafe(order));
     this.realtime.emitToRoom('managers', 'order.submitted', jsonSafe(order));
   }
 
   private async notifyStatusChange(
-    item: { id: string; nameSnapshot: string; orderId: string },
+    item: { id: string; nameSnapshot: string; orderId: string; guestId?: string | null },
     sessionId: string,
     status: 'preparing' | 'ready' | 'served',
   ) {
@@ -2294,12 +2320,29 @@ export class OrdersService {
         id: true,
         orderNumber: true,
         waiterId: true,
-        session: { select: { table: { select: { number: true } } } },
+        session: {
+          select: {
+            table: {
+              select: {
+                number: true,
+                qrTokens: {
+                  where: { isActive: true },
+                  orderBy: { createdAt: 'desc' },
+                  take: 1,
+                  select: { token: true },
+                },
+              },
+            },
+          },
+        },
       },
     });
     if (!order) return;
 
     const tableLabel = order.session.table.number;
+    const guestPath = order.session.table.qrTokens[0]?.token
+      ? `/m/${order.session.table.qrTokens[0].token}`
+      : '/m';
     const titles = {
       preparing: `${item.nameSnapshot} is preparing`,
       ready: `${item.nameSnapshot} is ready`,
@@ -2323,9 +2366,30 @@ export class OrdersService {
             orderItemId: item.id,
             status,
             sound: status === 'ready' ? 'order.ready' : 'order.preparing',
+            url: '/app/orders',
           },
         });
       }
+    }
+
+    // Guest closed-browser / iOS Home Screen alerts
+    if (item.guestId && (status === 'preparing' || status === 'ready')) {
+      await this.notifications.pushGuest({
+        type: status === 'ready' ? 'order.ready' : 'order.preparing',
+        title: titles[status],
+        body:
+          status === 'ready'
+            ? 'Your dish is ready — a waiter will bring it soon'
+            : 'The kitchen has started your order',
+        guestId: item.guestId,
+        sessionId,
+        url: guestPath,
+        payload: {
+          orderId: order.id,
+          orderItemId: item.id,
+          status,
+        },
+      });
     }
 
     this.realtime.emitToRoom(`session:${sessionId}`, 'order.status', {

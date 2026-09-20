@@ -59,6 +59,13 @@ services:
         sync: false
       - key: SENTRY_DSN
         sync: false
+      # Web Push VAPID — generate: npx web-push generate-vapid-keys
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: "mailto:ops@fajara.local"
       - key: SEED_PIN
         value: "1234"
       # Demo owner password for staging seed (change in dashboard if you want).

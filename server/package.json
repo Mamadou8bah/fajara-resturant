@@ -44,6 +44,11 @@
     "@nestjs/websockets": "^11.0.7",
     "@prisma/client": "^6.3.1",
     "@sentry/node": "^10.74.0",
+    "@types/express": "^5.0.0",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^22.10.7",
+    "@types/qrcode": "^1.5.6",
+    "@types/uuid": "^10.0.0",
     "argon2": "^0.41.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
@@ -58,13 +63,10 @@
     "tsx": "^4.23.13",
     "typescript": "^5.7.3",
     "uuid": "^11.0.5",
-    "@types/express": "^5.0.0",
-    "@types/multer": "^2.2.0",
-    "@types/node": "^22.10.7",
-    "@types/qrcode": "^1.5.6",
-    "@types/uuid": "^10.0.0"
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
-    "@nestjs/schematics": "^11.0.0"
+    "@nestjs/schematics": "^11.0.0",
+    "@types/web-push": "^3.6.4"
   }
 }

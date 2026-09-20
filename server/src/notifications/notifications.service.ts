@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { NotificationStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { PushService } from './push.service';
 
 /** Types that mean "claim this table" — only valid while the session has no waiter. */
 const CLAIMABLE_TYPES = new Set(['call_waiter']);
@@ -11,6 +12,7 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtime: RealtimeGateway,
+    private readonly push: PushService,
   ) {}
 
   async create(input: {
@@ -40,7 +42,40 @@ export class NotificationsService {
       input.broadcastRoom ??
       (input.employeeId ? `employee:${input.employeeId}` : 'waiters');
     this.realtime.emitToRoom(room, 'notification', notification);
+
+    void this.push.notify(notification, room).catch(() => undefined);
+
     return notification;
+  }
+
+  /** Closed-browser / iOS alerts for a guest visit (no staff inbox row). */
+  async pushGuest(input: {
+    type: string;
+    title: string;
+    body?: string;
+    guestId: string;
+    sessionId?: string;
+    url?: string;
+    payload?: Record<string, unknown>;
+  }) {
+    void this.push
+      .notify(
+        {
+          id: `guest-${input.guestId}-${Date.now()}`,
+          type: input.type,
+          title: input.title,
+          body: input.body ?? null,
+          employeeId: null,
+          sessionId: input.sessionId ?? null,
+          payload: {
+            ...(input.payload ?? {}),
+            guestId: input.guestId,
+            url: input.url,
+          },
+        },
+        `guest:${input.guestId}`,
+      )
+      .catch(() => undefined);
   }
 
   async listForEmployee(employeeId: string, status?: NotificationStatus) {

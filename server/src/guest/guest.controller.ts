@@ -64,6 +64,7 @@ export class GuestController {
       token,
       displayName: dto.displayName,
       partySize: dto.partySize,
+      deviceToken: dto.deviceToken,
     });
   }
 

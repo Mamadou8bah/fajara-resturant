@@ -164,6 +164,7 @@ model Employee {
   idempotencyKeys     IdempotencyKey[]
   paymentCorrectionsActor    PaymentCorrection[] @relation("PaymentCorrectionActor")
   paymentCorrectionsApprover PaymentCorrection[] @relation("PaymentCorrectionApprover")
+  pushSubscriptions   PushSubscription[]
 
   @@map("employees")
 }
@@ -279,6 +280,7 @@ model Guest {
 
   session    TableSession @relation(fields: [sessionId], references: [id])
   orderItems OrderItem[]
+  pushSubscriptions PushSubscription[]
 
   @@index([sessionId])
   @@map("guests")
@@ -769,6 +771,26 @@ model Notification {
   @@index([employeeId, status])
   @@index([createdAt])
   @@map("notifications")
+}
+
+/** Web Push endpoints for closed-browser / iOS Home Screen alerts. */
+model PushSubscription {
+  id         String   @id @default(uuid()) @db.Uuid
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  employeeId String?  @map("employee_id") @db.Uuid
+  guestId    String?  @map("guest_id") @db.Uuid
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  guest    Guest?    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([guestId])
+  @@map("push_subscriptions")
 }
 
 model ShiftType {

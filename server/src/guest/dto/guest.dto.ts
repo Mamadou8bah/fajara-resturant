@@ -27,6 +27,12 @@ export class GuestJoinDto {
   @IsInt()
   @Min(1)
   partySize?: number;
+
+  /** Stable phone/browser token — one active visit per device. */
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  deviceToken?: string;
 }
 
 export class GuestCallWaiterDto {

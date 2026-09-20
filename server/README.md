@@ -30,6 +30,7 @@ API defaults to `http://localhost:4000` (`/api`, `/realtime`).
    - `DATABASE_URL` — Neon **pooled** connection string
    - `SEED_OWNER_PASSWORD`
    - `CORS_ORIGIN` / `PUBLIC_WEB_URL` — web app HTTPS origin (Netlify)
+   - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` — Web Push (`npx web-push generate-vapid-keys`)
 4. Deploy — pre-deploy runs `pnpm migrate:deploy && pnpm seed`.
 
 Health check: `GET /api/health`

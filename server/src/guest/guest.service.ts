@@ -117,8 +117,63 @@ export class GuestService {
 
   async join(dto: GuestJoinDto) {
     const qr = await this.resolveToken(dto.token);
+    const incomingDevice = dto.deviceToken?.trim() || null;
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // One phone = one open visit. Resume same table, or leave the other first.
+      if (incomingDevice) {
+        const existingGuest = await tx.guest.findFirst({
+          where: {
+            deviceToken: incomingDevice,
+            session: { status: SessionStatus.OPEN },
+          },
+          include: {
+            session: true,
+          },
+        });
+
+        if (existingGuest) {
+          if (existingGuest.session.tableId === qr.tableId) {
+            const name = dto.displayName?.trim();
+            if (name) {
+              await tx.guest.update({
+                where: { id: existingGuest.id },
+                data: { displayName: name },
+              });
+            }
+            const seats = qr.table.seats;
+            return {
+              guestId: existingGuest.id,
+              sessionId: existingGuest.sessionId,
+              deviceToken: incomingDevice,
+              tableId: qr.tableId,
+              openingNew: false,
+              partySize: existingGuest.session.reservationPartySize,
+              seats,
+              joinedCount: existingGuest.session.guestCount,
+              resumed: true as const,
+            };
+          }
+
+            // Phone moves to a new table — unlink from the previous open visit.
+            const ordered = await tx.orderItem.count({
+              where: { guestId: existingGuest.id },
+            });
+            if (ordered === 0) {
+              await tx.guest.delete({ where: { id: existingGuest.id } });
+              await tx.tableSession.update({
+                where: { id: existingGuest.sessionId },
+                data: { guestCount: { decrement: 1 } },
+              });
+            } else {
+              await tx.guest.update({
+                where: { id: existingGuest.id },
+                data: { deviceToken: null },
+              });
+            }
+          }
+        }
+
       let session = await tx.tableSession.findFirst({
         where: {
           tableId: qr.tableId,
@@ -164,7 +219,6 @@ export class GuestService {
             status: SessionStatus.OPEN,
             guestCount: 0,
             reservationName: qr.table.reservationName,
-            // Expected headcount — does not create placeholder guests
             reservationPartySize: qr.table.reservationPartySize ?? partySize,
             reservationAt: qr.table.reservationAt,
             reservationNote: qr.table.reservationNote,
@@ -189,7 +243,7 @@ export class GuestService {
         });
       }
 
-      const deviceToken = randomToken(24);
+      const deviceToken = incomingDevice || randomToken(24);
       const guest = await tx.guest.create({
         data: {
           sessionId: session!.id,
@@ -213,32 +267,35 @@ export class GuestService {
         partySize: openingNew ? partySize : session!.reservationPartySize,
         seats,
         joinedCount: currentCount + 1,
+        resumed: false as const,
       };
     });
 
-    await this.activity.record({
-      actionType: 'guest.join',
-      entityType: 'guest',
-      entityId: result.guestId,
-      description: result.openingNew
-        ? `Guest opened table · party of ${result.partySize ?? 1}`
-        : `Guest joined the table`,
-      metadata: {
-        tableId: result.tableId,
-        partySize: result.partySize,
-        openingNew: result.openingNew,
-      },
-    });
+    if (!result.resumed) {
+      await this.activity.record({
+        actionType: 'guest.join',
+        entityType: 'guest',
+        entityId: result.guestId,
+        description: result.openingNew
+          ? `Guest opened table · party of ${result.partySize ?? 1}`
+          : `Guest joined the table`,
+        metadata: {
+          tableId: result.tableId,
+          partySize: result.partySize,
+          openingNew: result.openingNew,
+        },
+      });
 
-    this.realtime.emitToRoom('floor', 'session.updated', {
-      sessionId: result.sessionId,
-      tableId: result.tableId,
-    });
-    this.realtime.emitToRoom(
-      `session:${result.sessionId}`,
-      'guest.joined',
-      result,
-    );
+      this.realtime.emitToRoom('floor', 'session.updated', {
+        sessionId: result.sessionId,
+        tableId: result.tableId,
+      });
+      this.realtime.emitToRoom(
+        `session:${result.sessionId}`,
+        'guest.joined',
+        result,
+      );
+    }
 
     return {
       guestId: result.guestId,
