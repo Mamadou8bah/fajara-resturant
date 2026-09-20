@@ -565,6 +565,42 @@ export class PaymentsService {
       'payment.settled',
       payload,
     );
+
+    // Closed-browser / iOS alerts for guests whose bill was just paid.
+    const guestIds = dto.guestId
+      ? [dto.guestId]
+      : (transaction.created.session?.guests ?? []).map((g) => g.id);
+    if (guestIds.length > 0) {
+      const tableId =
+        transaction.created.session?.table?.id ?? transaction.tableId;
+      const qr = tableId
+        ? await this.prisma.tableQrToken.findFirst({
+            where: { tableId, isActive: true },
+            orderBy: { createdAt: 'desc' },
+            select: { token: true },
+          })
+        : null;
+      const guestPath = qr?.token ? `/m/${qr.token}` : '/m';
+      const totalLabel = String(transaction.billTotal);
+      const txnLabel = transaction.created.transactionNumber;
+      await Promise.all(
+        guestIds.map((guestId) =>
+          this.notifications.pushGuest({
+            type: 'payment.settled',
+            title: 'Bill paid',
+            body: `Thanks — ${txnLabel} is settled · ${totalLabel}. You can download your receipt.`,
+            guestId,
+            sessionId: transaction.sessionId,
+            url: guestPath,
+            payload: {
+              transactionId: transaction.created.id,
+              guestId,
+            },
+          }),
+        ),
+      );
+    }
+
     if (transaction.tableStatusAfter) {
       await this.notifications.resolveClaimableForSession(
         transaction.sessionId,

@@ -361,15 +361,21 @@ export function GuestMenuScreen({ token }: { token: string }) {
     const onSettled = (payload?: {
       id?: string;
       guestId?: string | null;
+      transactionNumber?: string;
+      total?: string | number;
     }) => {
       refreshOrders();
-      if (
+      const forMe =
         !payload?.guestId ||
         !session.guestId ||
-        payload.guestId === session.guestId
-      ) {
-        openReceipt(payload?.id);
-      }
+        payload.guestId === session.guestId;
+      if (!forMe) return;
+      setToast('Your bill is paid — thank you');
+      announceEvent({
+        kind: 'default',
+        text: 'Your bill is paid. You can download your receipt.',
+      });
+      openReceipt(payload?.id);
     };
 
     s.on('connect', onConnect);

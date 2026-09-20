@@ -15,6 +15,7 @@ const PUSHABLE_TYPES = new Set([
   'order.assigned',
   'order.ready',
   'order.preparing',
+  'payment.settled',
   'remake.request',
   'void.request',
   'comp.request',

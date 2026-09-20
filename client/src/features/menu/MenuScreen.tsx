@@ -380,7 +380,8 @@ export function MenuScreen() {
                         onClick={() =>
                           void onCreateCategory().then(() => setShowNewCat(false))
                         }
-                        disabled={busy}
+                        busy={busy}
+                        busyLabel="Creating…"
                       >
                         Add category
                       </Button>
@@ -405,6 +406,7 @@ export function MenuScreen() {
                           <div className="flex gap-2">
                             <Button
                               variant="outline"
+                              disabled={busy}
                               onClick={async () => {
                                 const name = window.prompt('Rename', c.name);
                                 if (!name?.trim()) return;
@@ -429,6 +431,8 @@ export function MenuScreen() {
                             </Button>
                             <Button
                               variant="danger"
+                              busy={busy}
+                              busyLabel="Archiving…"
                               onClick={async () => {
                                 setBusy(true);
                                 try {
@@ -571,6 +575,7 @@ export function MenuScreen() {
                               <Button
                                 variant="ghost"
                                 className="text-xs"
+                                disabled={busy}
                                 onClick={async () => {
                                   setBusy(true);
                                   try {
@@ -594,6 +599,8 @@ export function MenuScreen() {
                               <Button
                                 variant="danger"
                                 className="text-xs"
+                                busy={busy}
+                                busyLabel="Removing…"
                                 onClick={async () => {
                                   if (
                                     !window.confirm(
@@ -760,7 +767,8 @@ export function MenuScreen() {
                           <Button
                             variant="danger"
                             className="flex-1"
-                            disabled={busy}
+                            busy={busy}
+                            busyLabel="Removing…"
                             onClick={async () => {
                               const it = items.find((x) => x.id === editingItem);
                               if (!it) return;
@@ -967,7 +975,8 @@ export function MenuScreen() {
                       onClick={() =>
                         void onCreateSpecial().then(() => setShowNewSpecial(false))
                       }
-                      disabled={busy}
+                      busy={busy}
+                      busyLabel="Creating…"
                     >
                       Add special
                     </Button>
@@ -1013,6 +1022,7 @@ export function MenuScreen() {
                               <>
                                 <Button
                                   variant="outline"
+                                  disabled={busy}
                                   onClick={async () => {
                                     const price = window.prompt(
                                       'Special price',
@@ -1044,6 +1054,8 @@ export function MenuScreen() {
                                 </Button>
                                 <Button
                                   variant="danger"
+                                  busy={busy}
+                                  busyLabel="Deactivating…"
                                   onClick={async () => {
                                     setBusy(true);
                                     try {
@@ -1179,7 +1191,8 @@ export function MenuScreen() {
                       </select>
                     ) : null}
                     <Button
-                      disabled={busy}
+                      busy={busy}
+                      busyLabel="Creating…"
                       onClick={() => void onCreatePromotion()}
                     >
                       Add promotion
@@ -1215,6 +1228,8 @@ export function MenuScreen() {
                           {p.isActive ? (
                             <Button
                               variant="danger"
+                              busy={busy}
+                              busyLabel="Deactivating…"
                               onClick={async () => {
                                 setBusy(true);
                                 try {

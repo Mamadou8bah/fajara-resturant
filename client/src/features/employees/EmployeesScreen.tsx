@@ -488,7 +488,11 @@ export function EmployeesScreen({
                   </label>
                 </Can>
                 <div className="sm:col-span-2 flex flex-wrap gap-2">
-                  <Button type="submit" disabled={busy}>
+                  <Button
+                    type="submit"
+                    busy={busy}
+                    busyLabel={editing ? 'Saving…' : 'Creating…'}
+                  >
                     {editing ? 'Save changes' : 'Create'}
                   </Button>
                   {editing ? (
@@ -619,7 +623,8 @@ export function EmployeesScreen({
                     <Can permission="employees.manage">
                       <div className="flex flex-wrap gap-2">
                         <Button
-                          disabled={busy}
+                          busy={busy}
+                          busyLabel="Reactivating…"
                           onClick={() =>
                             void run(async () => {
                               await reactivateEmployee(emp.id);
@@ -726,7 +731,8 @@ export function EmployeesScreen({
                       onChange={(e) => setPerfTo(e.target.value)}
                     />
                     <Button
-                      disabled={busy}
+                      busy={busy}
+                      busyLabel="Loading…"
                       onClick={() =>
                         void (async () => {
                           setBusy(true);
@@ -815,7 +821,8 @@ export function EmployeesScreen({
                       <Button
                         variant="outline"
                         className="text-xs"
-                        disabled={busy}
+                        busy={busy}
+                        busyLabel="Loading…"
                         onClick={() =>
                           void (async () => {
                             setBusy(true);
@@ -930,7 +937,9 @@ export function EmployeesScreen({
                         }
                       />
                       <Button
-                        disabled={busy || !payForm.amountDue}
+                        busy={busy}
+                        disabled={!payForm.amountDue}
+                        busyLabel="Creating…"
                         onClick={() =>
                           void run(async () => {
                             await createPayroll({
@@ -1041,7 +1050,9 @@ export function EmployeesScreen({
                   }
                 />
                 <Button
-                  disabled={busy || !payForm.amountDue}
+                  busy={busy}
+                  disabled={!payForm.amountDue}
+                  busyLabel="Creating…"
                   onClick={() =>
                     void run(async () => {
                       await createPayroll({
@@ -1127,7 +1138,7 @@ export function EmployeesScreen({
                 value={perfTo}
                 onChange={(e) => setPerfTo(e.target.value)}
               />
-              <Button disabled={busy} onClick={() => void onLoadPerf()}>
+              <Button busy={busy} busyLabel="Loading…" onClick={() => void onLoadPerf()}>
                 Load
               </Button>
             </div>
@@ -1185,7 +1196,8 @@ export function EmployeesScreen({
               </Button>
               <Button
                 className="flex-1"
-                disabled={busy}
+                busy={busy}
+                busyLabel="Paying…"
                 onClick={() =>
                   void run(async () => {
                     await markPayrollPaid(payConfirm.id, {
@@ -1237,7 +1249,8 @@ export function EmployeesScreen({
               </Button>
               <Button
                 className="flex-1"
-                disabled={busy}
+                busy={busy}
+                busyLabel="Deactivating…"
                 onClick={() =>
                   void run(async () => {
                     await deactivateEmployee(confirmDeactivate.id);
@@ -1282,7 +1295,8 @@ export function EmployeesScreen({
               </Button>
               <Button
                 className="flex-1"
-                disabled={busy}
+                busy={busy}
+                busyLabel="Removing…"
                 onClick={() =>
                   void run(async () => {
                     await archiveEmployee(confirmRemove.id);

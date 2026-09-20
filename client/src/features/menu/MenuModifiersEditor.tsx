@@ -273,7 +273,8 @@ export function MenuModifiersEditor({
                 <Button
                   variant="danger"
                   className="text-xs"
-                  disabled={busy}
+                  busy={busy}
+                  busyLabel="Removing…"
                   onClick={() => {
                     if (!window.confirm(`Remove group “${g.name}”?`)) return;
                     void archiveModifierGroup(g.id)
@@ -589,7 +590,8 @@ export function MenuModifiersEditor({
               />
               <Button
                 variant="outline"
-                disabled={busy}
+                busy={busy}
+                busyLabel="Adding…"
                 onClick={() => void addOption(g.id)}
               >
                 Add option
@@ -607,7 +609,9 @@ export function MenuModifiersEditor({
           onChange={(e) => setGroupName(e.target.value)}
         />
         <Button
-          disabled={busy || !groupName.trim()}
+          busy={busy}
+          disabled={!groupName.trim()}
+          busyLabel="Creating…"
           onClick={() => void addGroup()}
         >
           Add group

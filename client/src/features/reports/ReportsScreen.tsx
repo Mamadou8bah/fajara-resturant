@@ -930,7 +930,11 @@ export function ReportsScreen({
               Apply
             </Button>
             <Can permission="reports.view">
-              <Button disabled={busy} onClick={() => void onExport('sales')}>
+              <Button
+                busy={busy}
+                busyLabel="Exporting…"
+                onClick={() => void onExport('sales')}
+              >
                 Download CSV
               </Button>
             </Can>
@@ -1492,7 +1496,8 @@ export function ReportsScreen({
               <Button
                 variant="outline"
                 className="shrink-0"
-                disabled={busy}
+                busy={busy}
+                busyLabel="Exporting…"
                 onClick={() => void onExport('activity')}
               >
                 Download CSV

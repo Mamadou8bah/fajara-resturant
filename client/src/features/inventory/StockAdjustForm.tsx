@@ -98,7 +98,8 @@ export function StockAdjustForm({
             <Button
               className="w-full"
               onClick={() => void onReceive()}
-              disabled={busy}
+              busy={busy}
+              busyLabel="Receiving…"
             >
               Receive stock
             </Button>
@@ -128,7 +129,8 @@ export function StockAdjustForm({
             <Button
               className="w-full"
               onClick={() => void onCount()}
-              disabled={busy}
+              busy={busy}
+              busyLabel="Saving…"
             >
               Save count
             </Button>
@@ -183,7 +185,8 @@ export function StockAdjustForm({
             <Button
               className="w-full"
               onClick={() => void onMovement()}
-              disabled={busy}
+              busy={busy}
+              busyLabel="Logging…"
             >
               Log removal
             </Button>
@@ -204,7 +207,8 @@ export function StockAdjustForm({
               void onArchive();
             }
           }}
-          disabled={busy}
+          busy={busy}
+          busyLabel="Archiving…"
         >
           Archive item
         </Button>

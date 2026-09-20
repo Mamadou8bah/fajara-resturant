@@ -290,7 +290,8 @@ export function ShiftPlanner({
             <Button
               variant="outline"
               className="shrink-0"
-              disabled={busy}
+              busy={busy}
+              busyLabel="Copying…"
               onClick={() =>
                 void run(async () => {
                   await copyLastWeek(weekStart);
@@ -551,7 +552,9 @@ export function ShiftPlanner({
                 />
               </label>
               <Button
-                disabled={busy || !templateName.trim() || !(weekly?.shifts.length)}
+                busy={busy}
+                disabled={!templateName.trim() || !(weekly?.shifts.length)}
+                busyLabel="Saving…"
                 onClick={() =>
                   void run(async () => {
                     const start = new Date(weekStart + 'T00:00:00.000Z');
@@ -607,7 +610,8 @@ export function ShiftPlanner({
                       <Button
                         variant="outline"
                         className="text-xs"
-                        disabled={busy}
+                        busy={busy}
+                        busyLabel="Applying…"
                         onClick={() =>
                           void run(async () => {
                             await applyShiftTemplate(t.id, weekStart);
@@ -796,7 +800,12 @@ export function ShiftPlanner({
             </label>
 
             <div className="mt-4 flex flex-wrap gap-2 pb-2">
-              <Button className="flex-1" disabled={busy} onClick={() => void saveCell()}>
+              <Button
+                className="flex-1"
+                busy={busy}
+                busyLabel="Saving…"
+                onClick={() => void saveCell()}
+              >
                 Save
               </Button>
               <Button

@@ -351,7 +351,12 @@ export function MenuDishForm({
       </div>
 
       <div className="flex gap-2 pb-1">
-        <Button onClick={onSave} disabled={busy || uploading} className="flex-1">
+        <Button
+          onClick={onSave}
+          busy={busy || uploading}
+          busyLabel={editingItem ? 'Saving…' : 'Creating…'}
+          className="flex-1"
+        >
           {editingItem ? 'Save dish' : 'Add dish & customize'}
         </Button>
         <Button variant="ghost" onClick={onCancel}>

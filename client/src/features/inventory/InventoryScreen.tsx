@@ -654,7 +654,8 @@ export function InventoryScreen() {
                         onClick={() =>
                           void onCreateItem().then(() => setShowNewItem(false))
                         }
-                        disabled={busy}
+                        busy={busy}
+                        busyLabel="Creating…"
                       >
                         Create item
                       </Button>
@@ -976,7 +977,11 @@ export function InventoryScreen() {
                         setBatchForm((f) => ({ ...f, notes: e.target.value }))
                       }
                     />
-                    <Button onClick={onConfirmBatch} disabled={busy}>
+                    <Button
+                      onClick={onConfirmBatch}
+                      busy={busy}
+                      busyLabel="Confirming…"
+                    >
                       Confirm batch
                     </Button>
                   </div>
@@ -1169,7 +1174,11 @@ export function InventoryScreen() {
                         </li>
                       ))}
                     </ul>
-                    <Button onClick={onCreateRecipe} disabled={busy}>
+                    <Button
+                      onClick={onCreateRecipe}
+                      busy={busy}
+                      busyLabel="Saving…"
+                    >
                       Save recipe
                     </Button>
                   </div>
@@ -1222,6 +1231,8 @@ export function InventoryScreen() {
                             </div>
                             <Button
                               variant="danger"
+                              busy={busy}
+                              busyLabel="Deleting…"
                               onClick={async () => {
                                 setBusy(true);
                                 try {
@@ -1378,7 +1389,9 @@ export function InventoryScreen() {
                       }
                     />
                     <Button
-                      disabled={busy || !supplierForm.name.trim()}
+                      busy={busy}
+                      disabled={!supplierForm.name.trim()}
+                      busyLabel="Saving…"
                       onClick={() => {
                         void (async () => {
                           setBusy(true);
@@ -1446,7 +1459,8 @@ export function InventoryScreen() {
                           <Button
                             variant="outline"
                             className="text-xs"
-                            disabled={busy}
+                            busy={busy}
+                            busyLabel={s.isActive ? 'Deactivating…' : 'Activating…'}
                             onClick={() => {
                               void (async () => {
                                 setBusy(true);

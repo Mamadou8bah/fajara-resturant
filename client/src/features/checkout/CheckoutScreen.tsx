@@ -234,6 +234,7 @@ export function CheckoutScreen() {
   const [tab, setTab] = useState<Tab>('settle');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
 
   const [floor, setFloor] = useState<FloorTable[]>([]);
   const [tableQuery, setTableQuery] = useState('');
@@ -577,6 +578,7 @@ export function CheckoutScreen() {
   }
 
   async function onCloseTill() {
+    setBusyKey('close-till');
     setBusy(true);
     setError(null);
     try {
@@ -591,6 +593,7 @@ export function CheckoutScreen() {
         });
         if (!approval) {
           setBusy(false);
+          setBusyKey(null);
           return;
         }
         approverEmployeeId = approval.approverEmployeeId;
@@ -611,6 +614,7 @@ export function CheckoutScreen() {
       setError(e instanceof Error ? e.message : 'Close till failed');
     } finally {
       setBusy(false);
+      setBusyKey(null);
     }
   }
 
@@ -620,6 +624,7 @@ export function CheckoutScreen() {
       setError('Amount and reason required');
       return;
     }
+    setBusyKey(direction === 'in' ? 'paid-in' : 'paid-out');
     setBusy(true);
     setError(null);
     try {
@@ -635,6 +640,7 @@ export function CheckoutScreen() {
       setError(e instanceof Error ? e.message : 'Till movement failed');
     } finally {
       setBusy(false);
+      setBusyKey(null);
     }
   }
 
@@ -649,6 +655,7 @@ export function CheckoutScreen() {
       description: 'Manager PIN required to adjust till cash.',
     });
     if (!approval) return;
+    setBusyKey('till-adjust');
     setBusy(true);
     setError(null);
     try {
@@ -665,6 +672,7 @@ export function CheckoutScreen() {
       setError(e instanceof Error ? e.message : 'Till adjustment failed');
     } finally {
       setBusy(false);
+      setBusyKey(null);
     }
   }
 
@@ -715,6 +723,7 @@ export function CheckoutScreen() {
 
   async function onReprint() {
     if (!receipt) return;
+    setBusyKey('reprint');
     setBusy(true);
     try {
       let id = lastTxnId;
@@ -734,6 +743,7 @@ export function CheckoutScreen() {
       setError(e instanceof Error ? e.message : 'Reprint failed');
     } finally {
       setBusy(false);
+      setBusyKey(null);
     }
   }
 
@@ -754,6 +764,7 @@ export function CheckoutScreen() {
       window.prompt('Reason for reopening', 'Correction after settlement') ??
       '';
     if (!reason.trim()) return;
+    setBusyKey('reopen');
     setBusy(true);
     setError(null);
     try {
@@ -774,6 +785,7 @@ export function CheckoutScreen() {
       setError(e instanceof Error ? e.message : 'Reopen failed');
     } finally {
       setBusy(false);
+      setBusyKey(null);
     }
   }
 
@@ -1280,7 +1292,9 @@ export function CheckoutScreen() {
                     <Button
                       variant="outline"
                       onClick={onReprint}
+                      busy={busyKey === 'reprint'}
                       disabled={busy}
+                      busyLabel="Reprint…"
                     >
                       Reprint
                     </Button>
@@ -1288,7 +1302,9 @@ export function CheckoutScreen() {
                       <Button
                         variant="danger"
                         onClick={() => void onReopenOrders()}
+                        busy={busyKey === 'reopen'}
                         disabled={busy || !(receipt.orderIds?.length)}
+                        busyLabel="Reopening…"
                       >
                         Reopen order
                       </Button>
@@ -1370,7 +1386,12 @@ export function CheckoutScreen() {
                     value={tillNotes}
                     onChange={(e) => setTillNotes(e.target.value)}
                   />
-                  <Button onClick={onCloseTill} disabled={busy}>
+                  <Button
+                    onClick={onCloseTill}
+                    busy={busyKey === 'close-till'}
+                    disabled={busy}
+                    busyLabel="Closing…"
+                  >
                     Close till
                   </Button>
                 </div>
@@ -1400,13 +1421,20 @@ export function CheckoutScreen() {
                     onChange={(e) => setMoveReason(e.target.value)}
                   />
                   <div className="flex flex-wrap gap-2">
-                    <Button onClick={() => onPaid('in')} disabled={busy}>
+                    <Button
+                      onClick={() => onPaid('in')}
+                      busy={busyKey === 'paid-in'}
+                      disabled={busy}
+                      busyLabel="Saving…"
+                    >
                       Paid in
                     </Button>
                     <Button
                       variant="outline"
                       onClick={() => onPaid('out')}
+                      busy={busyKey === 'paid-out'}
                       disabled={busy}
+                      busyLabel="Saving…"
                     >
                       Paid out
                     </Button>
@@ -1414,7 +1442,9 @@ export function CheckoutScreen() {
                       <Button
                         variant="ghost"
                         onClick={() => void onTillAdjust()}
+                        busy={busyKey === 'till-adjust'}
                         disabled={busy}
+                        busyLabel="Adjusting…"
                       >
                         Adjust (mgr)
                       </Button>
@@ -1511,7 +1541,11 @@ export function CheckoutScreen() {
                 value={historySearch}
                 onChange={(e) => setHistorySearch(e.target.value)}
               />
-              <Button onClick={() => void loadHistory()} disabled={busy}>
+              <Button
+                onClick={() => void loadHistory()}
+                busy={busy}
+                busyLabel="Loading…"
+              >
                 Search
               </Button>
             </div>

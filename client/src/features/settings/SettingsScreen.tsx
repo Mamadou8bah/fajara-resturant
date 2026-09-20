@@ -1500,7 +1500,8 @@ export function SettingsScreen() {
                           <Button
                             variant="outline"
                             className="text-xs"
-                            disabled={busy}
+                            busy={busy}
+                            busyLabel="Deactivating…"
                             onClick={() =>
                               void (async () => {
                                 setBusy(true);
@@ -1534,7 +1535,8 @@ export function SettingsScreen() {
                           <Button
                             variant="outline"
                             className="text-xs"
-                            disabled={busy}
+                            busy={busy}
+                            busyLabel="Reactivating…"
                             onClick={() =>
                               void (async () => {
                                 setBusy(true);
@@ -1612,7 +1614,9 @@ export function SettingsScreen() {
                   </div>
                   <Button
                     className="mt-3"
-                    disabled={busy || !shiftTypeDraft.name.trim()}
+                    busy={busy}
+                    disabled={!shiftTypeDraft.name.trim()}
+                    busyLabel="Creating…"
                     onClick={() =>
                       void (async () => {
                         setBusy(true);
@@ -1697,7 +1701,11 @@ export function SettingsScreen() {
                       />
                     </Field>
                     <div className="flex items-end">
-                      <Button disabled={busy} onClick={() => void onCreateTable()}>
+                      <Button
+                        busy={busy}
+                        busyLabel="Creating…"
+                        onClick={() => void onCreateTable()}
+                      >
                         Add table
                       </Button>
                     </div>
@@ -1757,7 +1765,8 @@ export function SettingsScreen() {
                           </Button>
                           <Button
                             variant="danger"
-                            disabled={busy}
+                            busy={busy}
+                            busyLabel="Archiving…"
                             onClick={() => void onArchiveTable(t.id)}
                           >
                             Archive
@@ -1784,7 +1793,12 @@ export function SettingsScreen() {
                     ))}
                   </select>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Button disabled={busy || !selectedTable} onClick={() => void onExportQr()}>
+                    <Button
+                      busy={busy}
+                      disabled={!selectedTable}
+                      busyLabel="Exporting…"
+                      onClick={() => void onExportQr()}
+                    >
                       Export QR
                     </Button>
                     <Button
@@ -1923,7 +1937,11 @@ export function SettingsScreen() {
                   })}
                 </ul>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Button disabled={busy} onClick={() => void saveRolePermissions()}>
+                  <Button
+                    busy={busy}
+                    busyLabel="Saving…"
+                    onClick={() => void saveRolePermissions()}
+                  >
                     Save permissions
                   </Button>
                   <Button
@@ -2143,7 +2161,8 @@ export function SettingsScreen() {
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant="outline"
-                    disabled={busy}
+                    busy={busy}
+                    busyLabel="Exporting…"
                     onClick={() =>
                       void (async () => {
                         setBusy(true);
@@ -2310,7 +2329,8 @@ export function SettingsScreen() {
                 </div>
                 <Button
                   className="mt-3"
-                  disabled={busy}
+                  busy={busy}
+                  busyLabel="Updating…"
                   onClick={() => void onChangePin()}
                 >
                   Update PIN
@@ -2361,7 +2381,8 @@ export function SettingsScreen() {
                     </div>
                     <Button
                       className="mt-3"
-                      disabled={busy}
+                      busy={busy}
+                      busyLabel="Updating…"
                       onClick={() => void onChangePassword()}
                     >
                       Update password
