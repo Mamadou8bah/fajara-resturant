@@ -47,6 +47,7 @@ import {
 } from './api';
 import { GuestQrScanner } from './GuestQrScanner';
 import { BrandLogo } from '@/lib/brand';
+import { recordGuestLaunch } from '@/lib/pwaLaunch';
 import {
   downloadElementAsPng,
   receiptImageFilename,
@@ -125,7 +126,13 @@ function PriorProgressDots({ stage }: { stage: number }) {
   );
 }
 
-export function GuestMenuScreen({ token }: { token: string }) {
+export function GuestMenuScreen({
+  token,
+  tableId,
+}: {
+  token: string;
+  tableId?: string;
+}) {
   const router = useRouter();
   const {
     session,
@@ -150,7 +157,6 @@ export function GuestMenuScreen({ token }: { token: string }) {
   const [busy, setBusy] = useState(false);
   const [callBusy, setCallBusy] = useState(false);
   const [displayName, setDisplayName] = useState('');
-  const [partySize, setPartySize] = useState(1);
   useCriticalForm(busy || cart.length > 0);
   const [view, setView] = useState<'menu' | 'cart' | 'orders'>('menu');
   const [picked, setPicked] = useState<GuestMenuItem | null>(null);
@@ -207,9 +213,10 @@ export function GuestMenuScreen({ token }: { token: string }) {
       }>('/settings/public', { public: true }).catch(() => null);
 
       setMenu(m);
-      if (m.table.canOpenSession) {
-        setPartySize(1);
-      }
+      recordGuestLaunch({
+        tableId: tableId || m.table.id,
+        token: m.token || token,
+      });
       if (pub?.menuSettings) setMenuSettings(pub.menuSettings);
       const trading = pub?.profile?.tradingName?.trim();
       const rest = pub?.restaurantName?.trim();
@@ -243,6 +250,7 @@ export function GuestMenuScreen({ token }: { token: string }) {
     }
   }, [
     token,
+    tableId,
     loadForToken,
     loadCart,
     clearSession,
@@ -462,6 +470,14 @@ export function GuestMenuScreen({ token }: { token: string }) {
 
   function openItem(item: GuestMenuItem) {
     if (item.isSoldOut) return;
+    if (!session) {
+      setToast(
+        menu?.table.sessionOpen
+          ? 'Join the table first to add items'
+          : 'Ask staff to open your table before ordering',
+      );
+      return;
+    }
     const defaults =
       item.modifierGroups?.flatMap((g) =>
         g.options.filter((o) => o.isDefault).map((o) => o.id),
@@ -588,21 +604,59 @@ export function GuestMenuScreen({ token }: { token: string }) {
       </section>
     ) : null;
 
+  const browseMenuBlock = (
+    <div className="space-y-6 pt-2">
+      <SearchField
+        value={menuQuery}
+        onChange={setMenuQuery}
+        placeholder="Search the menu"
+      />
+      <FilterChips
+        value={categoryId}
+        onChange={setCategoryId}
+        options={[
+          { value: 'all', label: 'All' },
+          ...(menu?.categories.map((c) => ({
+            value: c.id,
+            label: c.name,
+          })) ?? []),
+        ]}
+      />
+      {menuSettings.specialsPosition !== 'bottom' ? specialsBlock : null}
+      {filteredCategories.map((cat) => (
+        <section key={cat.id}>
+          <h2 className="mb-3 font-display text-xl font-bold">{cat.name}</h2>
+          <ul className="space-y-3">
+            {cat.menuItems.map((item) => (
+              <li key={item.id}>
+                {renderDishCard({
+                  item,
+                  price: itemPrice(item),
+                })}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+      {menuSettings.specialsPosition === 'bottom' ? specialsBlock : null}
+      {filteredCategories.length === 0 && filteredSpecials.length === 0 ? (
+        <EmptyState title="No dishes found" body="Try another search." />
+      ) : null}
+    </div>
+  );
+
   async function onJoin(e?: React.FormEvent) {
     e?.preventDefault();
     const name = displayName.trim();
-    const opening = Boolean(menu?.table.canOpenSession);
     const seats = menu?.table.seats ?? 1;
     const remaining = menu?.table.remainingSeats ?? seats;
+    if (!menu?.table.sessionOpen) {
+      setJoinError('Ask staff to open your table before ordering.');
+      return;
+    }
     if (remaining <= 0) {
       setJoinError('This table is full. Ask staff for help.');
       return;
-    }
-    if (opening) {
-      if (partySize < 1 || partySize > seats) {
-        setJoinError(`Party size must be between 1 and ${seats}`);
-        return;
-      }
     }
     setBusy(true);
     setJoinError(null);
@@ -610,7 +664,6 @@ export function GuestMenuScreen({ token }: { token: string }) {
     try {
       const res = await guestJoin(token, {
         displayName: name || undefined,
-        partySize: opening ? partySize : undefined,
         deviceToken: getOrCreateDeviceToken(),
       });
       rememberDeviceToken(res.deviceToken);
@@ -622,19 +675,7 @@ export function GuestMenuScreen({ token }: { token: string }) {
         deviceToken: res.deviceToken,
         displayName: name || null,
       });
-      if (opening) {
-        setToast(
-          partySize === 1
-            ? name
-              ? `Welcome, ${name}`
-              : 'Welcome — others can still scan this table'
-            : name
-              ? `Welcome, ${name} · party of ${partySize}`
-              : `Welcome · party of ${partySize}`,
-        );
-      } else {
-        setToast(name ? `Welcome, ${name}` : 'Welcome — you can order now');
-      }
+      setToast(name ? `Welcome, ${name}` : 'Welcome — you can order now');
       // Refresh seating counts for any follow-up UI
       void fetchGuestMenu(token).then(setMenu).catch(() => undefined);
     } catch (err) {
@@ -787,7 +828,7 @@ export function GuestMenuScreen({ token }: { token: string }) {
       const msg = e instanceof Error ? e.message : 'Order failed';
       // Only drop the visit when the table truly has no open seating left.
       if (
-        /no open session for this table|session is not open|no active visit|table .* is not available|table is full/i.test(
+        /not open yet|no open session for this table|session is not open|no active visit|table .* is not available|table is full/i.test(
           msg,
         )
       ) {
@@ -1003,13 +1044,19 @@ export function GuestMenuScreen({ token }: { token: string }) {
           ) : null}
           {scanOpen ? (
             <GuestQrScanner
-              onToken={(next) => {
+              onPath={(path) => {
                 setScanOpen(false);
-                if (next === token) {
-                  setError('That QR is the same link — ask staff if it still fails.');
+                const current =
+                  tableId != null
+                    ? `/t/${tableId}`
+                    : `/m/${encodeURIComponent(token)}`;
+                if (path === current || path === `/m/${token}`) {
+                  setError(
+                    'That QR is the same link — ask staff if it still fails.',
+                  );
                   return;
                 }
-                router.replace(`/m/${encodeURIComponent(next)}`);
+                router.replace(path);
               }}
               onCancel={() => setScanOpen(false)}
             />
@@ -1042,11 +1089,51 @@ export function GuestMenuScreen({ token }: { token: string }) {
     );
   }
 
-  // Scan → name (+ party size if opening) then the guest menu.
+  // Staff must open the table first. Until then guests can browse only.
+  if (!session && !menu.table.sessionOpen) {
+    return (
+      <GuestShell
+        brandName={brandName}
+        logoUrl={logoUrl}
+        tableLabel={tableLabel}
+        subtitle={subtitle}
+        footer={
+          <p className="px-1 text-center text-sm text-muted">
+            Browse the menu — ask staff to open your table when you are seated.
+          </p>
+        }
+      >
+        <div className="mb-3 mt-3 rounded-2xl bg-[#F6E4DC] px-4 py-3 text-sm text-ink">
+          <p className="font-bold">Waiting for staff</p>
+          <p className="mt-1 text-muted">
+            Ask a staff member to open {tableLabel || 'this table'} on the floor
+            plan before you can join and order.
+          </p>
+          <Button
+            variant="outline"
+            className="mt-3 w-full"
+            onClick={() => void load()}
+          >
+            Check again
+          </Button>
+        </div>
+        {toast ? (
+          <p className="mb-3 rounded-2xl bg-[#DCEBE4] px-4 py-3 text-sm font-medium text-ready">
+            {toast}
+          </p>
+        ) : null}
+        {error ? (
+          <ErrorBanner message={error} onClose={() => setError(null)} />
+        ) : null}
+        {browseMenuBlock}
+      </GuestShell>
+    );
+  }
+
+  // Session open — name then the guest menu.
   if (!session) {
     const seats = menu.table.seats ?? 1;
     const remaining = menu.table.remainingSeats ?? seats;
-    const opening = menu.table.canOpenSession;
     const tableFull = remaining <= 0;
     return (
       <div className="app-shell mx-auto w-full max-w-lg bg-cream text-ink md:h-auto md:max-h-none md:min-h-[100dvh] md:max-w-xl md:overflow-visible">
@@ -1096,45 +1183,13 @@ export function GuestMenuScreen({ token }: { token: string }) {
                     }}
                   />
                 </label>
-                {opening ? (
-                  <div>
-                    <p className="mb-2 text-left text-sm font-semibold">
-                      How many people?
-                    </p>
-                    <div className="flex items-center justify-center gap-4">
-                      <button
-                        type="button"
-                        className="flex h-12 w-12 items-center justify-center rounded-full bg-[#EDE6DA] text-xl font-bold"
-                        onClick={() =>
-                          setPartySize((n) => Math.max(1, n - 1))
-                        }
-                        aria-label="Fewer people"
-                      >
-                        −
-                      </button>
-                      <span className="min-w-[3rem] text-center font-display text-3xl font-extrabold">
-                        {partySize}
-                      </span>
-                      <button
-                        type="button"
-                        className="flex h-12 w-12 items-center justify-center rounded-full bg-cta text-xl font-bold text-cream"
-                        onClick={() =>
-                          setPartySize((n) => Math.min(seats, n + 1))
-                        }
-                        aria-label="More people"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
                 <Button
                   type="submit"
                   className="w-full text-base"
                   busy={busy}
                   busyLabel="Joining…"
                 >
-                  {opening ? 'Continue' : 'Start ordering'}
+                  Start ordering
                 </Button>
               </>
             ) : null}

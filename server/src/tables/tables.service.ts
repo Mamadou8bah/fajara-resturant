@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { SessionStatus, TableStatus } from '@prisma/client';
 import { ActivityLogService } from '../audit/activity-log.service';
+import { resolveAppEnv } from '../common/env';
 import { randomToken } from '../common/utils/ids';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
@@ -348,7 +349,15 @@ export class TablesService {
       'http://localhost:3000'
     ).replace(/\/$/, '');
 
-    const url = `${webBase}/m/${active.token}`;
+    // Production stickers use stable /t/{tableId} so rotating tokens never need reprint.
+    // Staging/dev keep /m/{token} on the PNG for familiar UAT demos.
+    const appEnv = resolveAppEnv();
+    const path =
+      appEnv === 'production'
+        ? `/t/${table.id}`
+        : `/m/${active.token}`;
+    const url = `${webBase}${path}`;
+    const stableUrl = `${webBase}/t/${table.id}`;
 
     const QRCode = await import('qrcode');
     const pngBuffer = await QRCode.toBuffer(url, {
@@ -362,7 +371,10 @@ export class TablesService {
 
     return {
       token: active.token,
+      tableId: table.id,
       url,
+      stableUrl,
+      path,
       tableNumber: table.number,
       tableLabel: table.label,
       restaurantName,

@@ -1811,7 +1811,9 @@ export function SettingsScreen() {
                           try {
                             await rotateTableQr(selectedTable);
                             setQr(await exportTableQr(selectedTable));
-                            setSaved('QR rotated');
+                            setSaved(
+                              'QR token rotated (printed stickers keep working in production)',
+                            );
                           } catch (e) {
                             setError(
                               e instanceof Error
@@ -1827,6 +1829,11 @@ export function SettingsScreen() {
                       Rotate & export
                     </Button>
                   </div>
+                  <p className="mt-2 text-xs text-muted">
+                    Production stickers use a stable table link. Rotating the internal
+                    token does not require reprinting. Staging exports may still show
+                    the demo /m/… token URL.
+                  </p>
                   {qr ? (
                     <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1838,6 +1845,11 @@ export function SettingsScreen() {
                       <div className="text-sm">
                         <p className="font-semibold">{qr.printLabel}</p>
                         <p className="mt-1 break-all text-muted">{qr.url}</p>
+                        {qr.stableUrl && qr.stableUrl !== qr.url ? (
+                          <p className="mt-1 break-all text-xs text-muted">
+                            Stable: {qr.stableUrl}
+                          </p>
+                        ) : null}
                         <a
                           className="mt-3 inline-block text-cta underline"
                           href={qr.imageDataUrl}

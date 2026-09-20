@@ -23,29 +23,45 @@ function getBarcodeDetector():
   return BD ?? null;
 }
 
-/** Pull a guest menu token from a scanned QR payload (URL or raw token). */
-export function tokenFromQrPayload(raw: string): string | null {
+/** Pull a guest menu path from a scanned QR payload (URL or raw token). */
+export function guestPathFromQrPayload(raw: string): string | null {
   const text = raw.trim();
   if (!text) return null;
   try {
     const url = new URL(text);
-    const m = url.pathname.match(/\/m\/([^/]+)\/?$/);
-    if (m?.[1]) return decodeURIComponent(m[1]);
+    const byTable = url.pathname.match(/\/t\/([^/]+)\/?$/);
+    if (byTable?.[1]) return `/t/${decodeURIComponent(byTable[1])}`;
+    const byToken = url.pathname.match(/\/m\/([^/]+)\/?$/);
+    if (byToken?.[1]) return `/m/${decodeURIComponent(byToken[1])}`;
   } catch {
     /* not a full URL */
   }
+  const tableMatch = text.match(/\/t\/([^/?#\s]+)\/?/);
+  if (tableMatch?.[1]) return `/t/${decodeURIComponent(tableMatch[1])}`;
   const pathMatch = text.match(/\/m\/([^/?#\s]+)\/?/);
-  if (pathMatch?.[1]) return decodeURIComponent(pathMatch[1]);
+  if (pathMatch?.[1]) return `/m/${decodeURIComponent(pathMatch[1])}`;
   // Bare token from our QR exports (no spaces, reasonable length)
-  if (/^[A-Za-z0-9_-]{8,128}$/.test(text)) return text;
+  if (/^[A-Za-z0-9_-]{8,128}$/.test(text)) {
+    return `/m/${text}`;
+  }
   return null;
+}
+
+/** @deprecated Prefer guestPathFromQrPayload — returns token only for /m/… */
+export function tokenFromQrPayload(raw: string): string | null {
+  const path = guestPathFromQrPayload(raw);
+  if (!path) return null;
+  const m = path.match(/^\/m\/(.+)$/);
+  return m?.[1] ? decodeURIComponent(m[1]) : null;
 }
 
 export function GuestQrScanner({
   onToken,
+  onPath,
   onCancel,
 }: {
-  onToken: (token: string) => void;
+  onToken?: (token: string) => void;
+  onPath?: (path: string) => void;
   onCancel?: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -115,11 +131,15 @@ export function GuestQrScanner({
               const codes = await detector.detect(video);
               const raw = codes[0]?.rawValue;
               if (raw) {
-                const token = tokenFromQrPayload(raw);
-                if (token) {
+                const path = guestPathFromQrPayload(raw);
+                if (path) {
                   handledRef.current = true;
                   stop();
-                  onToken(token);
+                  if (onPath) onPath(path);
+                  else if (onToken) {
+                    const m = path.match(/^\/m\/(.+)$/);
+                    if (m?.[1]) onToken(decodeURIComponent(m[1]));
+                  }
                   return;
                 }
               }
@@ -149,7 +169,7 @@ export function GuestQrScanner({
       cancelled = true;
       stop();
     };
-  }, [onToken, stop]);
+  }, [onToken, onPath, stop]);
 
   return (
     <div className="space-y-3">

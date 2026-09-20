@@ -57,6 +57,7 @@ export type GuestSpecial = {
 };
 
 export type GuestMenuResponse = {
+  token?: string;
   table: {
     id: string;
     number: string | number;
@@ -66,7 +67,12 @@ export type GuestMenuResponse = {
     joinedCount: number;
     remainingSeats: number;
     expectedPartySize: number | null;
+    /** Always false — guests cannot open tables. */
     canOpenSession: boolean;
+    /** Staff has opened the table on Floor. */
+    sessionOpen: boolean;
+    /** Session is open and seats remain. */
+    canJoin: boolean;
   };
   categories: GuestMenuCategory[];
   specials: GuestSpecial[];
@@ -160,23 +166,46 @@ export type GuestReceipt = {
 export function fetchGuestMenu(token: string) {
   return api<GuestMenuResponse>(`/guest/menu/${encodeURIComponent(token)}`, {
     public: true,
-  }).then((menu) => {
-    const seats = Number(menu.table.seats ?? 0) || 0;
-    const joinedCount = Number(menu.table.joinedCount ?? 0) || 0;
-    return normalizeGuestMenu({
-      ...menu,
-      table: {
-        ...menu.table,
-        seats,
-        joinedCount,
-        remainingSeats:
-          menu.table.remainingSeats ?? Math.max(0, seats - joinedCount),
-        expectedPartySize: menu.table.expectedPartySize ?? null,
-        canOpenSession: Boolean(
-          menu.table.canOpenSession ?? joinedCount === 0,
-        ),
-      },
-    });
+  }).then(normalizeGuestMenuResponse);
+}
+
+export function fetchGuestMenuByTableId(tableId: string) {
+  return api<GuestMenuResponse>(
+    `/guest/menu-by-table/${encodeURIComponent(tableId)}`,
+    { public: true },
+  ).then(normalizeGuestMenuResponse);
+}
+
+export function resolveGuestByTableId(tableId: string) {
+  return api<{
+    token: string;
+    path: string;
+    table: { id: string; number: string | number; label: string | null };
+  }>(`/guest/by-table/${encodeURIComponent(tableId)}`, { public: true });
+}
+
+function normalizeGuestMenuResponse(menu: GuestMenuResponse): GuestMenuResponse {
+  const seats = Number(menu.table.seats ?? 0) || 0;
+  const joinedCount = Number(menu.table.joinedCount ?? 0) || 0;
+  const remainingSeats =
+    menu.table.remainingSeats ?? Math.max(0, seats - joinedCount);
+  const sessionOpen = Boolean(
+    menu.table.sessionOpen ?? !menu.table.canOpenSession,
+  );
+  return normalizeGuestMenu({
+    ...menu,
+    table: {
+      ...menu.table,
+      seats,
+      joinedCount,
+      remainingSeats,
+      expectedPartySize: menu.table.expectedPartySize ?? null,
+      canOpenSession: false,
+      sessionOpen,
+      canJoin: Boolean(
+        menu.table.canJoin ?? (sessionOpen && remainingSeats > 0),
+      ),
+    },
   });
 }
 

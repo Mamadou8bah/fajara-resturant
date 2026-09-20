@@ -22,7 +22,10 @@ export type DiningTable = {
 
 export type QrExport = {
   token: string;
+  tableId?: string;
   url: string;
+  stableUrl?: string;
+  path?: string;
   tableNumber: string;
   tableLabel: string | null;
   restaurantName: string;

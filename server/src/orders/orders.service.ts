@@ -1817,12 +1817,7 @@ export class OrdersService {
     });
 
     if (assigned?.guests?.length) {
-      const qr = await this.prisma.tableQrToken.findFirst({
-        where: { tableId: assigned.tableId, isActive: true },
-        orderBy: { createdAt: 'desc' },
-        select: { token: true },
-      });
-      const guestPath = qr?.token ? `/m/${qr.token}` : '/m';
+      const guestPath = `/t/${assigned.tableId}`;
       const waiterName = assigned.waiter?.fullName?.split(' ')[0] || 'A waiter';
       await Promise.all(
         assigned.guests.map((g) =>
@@ -2320,13 +2315,8 @@ export class OrdersService {
           select: {
             table: {
               select: {
+                id: true,
                 number: true,
-                qrTokens: {
-                  where: { isActive: true },
-                  orderBy: { createdAt: 'desc' },
-                  take: 1,
-                  select: { token: true },
-                },
               },
             },
           },
@@ -2336,9 +2326,7 @@ export class OrdersService {
     if (!order) return;
 
     const tableLabel = order.session.table.number;
-    const guestPath = order.session.table.qrTokens[0]?.token
-      ? `/m/${order.session.table.qrTokens[0].token}`
-      : '/m';
+    const guestPath = `/t/${order.session.table.id}`;
     const titles = {
       preparing: `${item.nameSnapshot} is preparing`,
       ready: `${item.nameSnapshot} is ready`,

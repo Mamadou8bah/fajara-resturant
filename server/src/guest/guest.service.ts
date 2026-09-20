@@ -38,9 +38,29 @@ export class GuestService {
 
   async resolveMenuByToken(token: string) {
     const qr = await this.resolveToken(token);
+    return this.buildPublicMenu(qr.token, qr.table);
+  }
+
+  /** Stable printable QR path: /t/{tableId} → active internal token + menu. */
+  async resolveMenuByTableId(tableId: string) {
+    const resolved = await this.resolveByTableId(tableId);
+    const qr = await this.resolveToken(resolved.token);
+    return this.buildPublicMenu(qr.token, qr.table);
+  }
+
+  private async buildPublicMenu(
+    token: string,
+    table: {
+      id: string;
+      number: string;
+      label: string | null;
+      status: TableStatus;
+      seats: number;
+    },
+  ) {
     const menu = await this.menu.getPublicMenuTree();
     const open = await this.prisma.tableSession.findFirst({
-      where: { tableId: qr.tableId, status: SessionStatus.OPEN },
+      where: { tableId: table.id, status: SessionStatus.OPEN },
       orderBy: { openedAt: 'desc' },
       select: {
         id: true,
@@ -48,22 +68,72 @@ export class GuestService {
         reservationPartySize: true,
       },
     });
-    const seats = qr.table.seats;
+    const seats = table.seats;
     const joinedCount = open?.guestCount ?? 0;
     const remainingSeats = Math.max(0, seats - joinedCount);
+    const sessionOpen = Boolean(open);
     return {
+      token,
       table: {
-        id: qr.table.id,
-        number: qr.table.number,
-        label: qr.table.label,
-        status: qr.table.status,
+        id: table.id,
+        number: table.number,
+        label: table.label,
+        status: table.status,
         seats,
         joinedCount,
         remainingSeats,
         expectedPartySize: open?.reservationPartySize ?? null,
-        canOpenSession: !open,
+        /** Guests never open tables — staff must Open on Floor first. */
+        canOpenSession: false,
+        sessionOpen,
+        canJoin: sessionOpen && remainingSeats > 0,
       },
       ...menu,
+    };
+  }
+
+  /** Production-safe: table UUID → active QR token (printed stickers use /t/{id}). */
+  async resolveByTableId(tableId: string) {
+    const id = tableId?.trim();
+    if (!id) {
+      throw new BadRequestException('table id is required');
+    }
+
+    const table = await this.prisma.diningTable.findFirst({
+      where: { id, isArchived: false },
+      include: {
+        qrTokens: {
+          where: { isActive: true, deactivatedAt: null },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+    if (!table) {
+      throw new NotFoundException('Table not found');
+    }
+
+    let token = table.qrTokens[0]?.token;
+    if (!token) {
+      const created = await this.prisma.tableQrToken.create({
+        data: {
+          tableId: table.id,
+          token: randomToken(24),
+          isActive: true,
+        },
+      });
+      token = created.token;
+    }
+
+    return {
+      table: {
+        id: table.id,
+        number: table.number,
+        label: table.label,
+        status: table.status,
+      },
+      token,
+      path: `/t/${table.id}`,
     };
   }
 
@@ -111,6 +181,7 @@ export class GuestService {
         status: table.status,
       },
       token,
+      // Staging demos keep /m/… shortcuts; /t/{id} also works.
       path: `/m/${token}`,
     };
   }
@@ -183,65 +254,21 @@ export class GuestService {
         include: { guests: true },
       });
 
+      if (!session) {
+        throw new BadRequestException(
+          `Table ${qr.table.number} is not open yet. Ask staff to open your table before ordering.`,
+        );
+      }
+
       const seats = qr.table.seats;
-      const currentCount = session?.guestCount ?? session?.guests.length ?? 0;
+      const currentCount = session.guestCount ?? session.guests.length ?? 0;
       if (currentCount >= seats) {
         throw new BadRequestException(
           `Table ${qr.table.number} is full (${seats} seats). Ask staff if you need another table.`,
         );
       }
 
-      const openingNew = !session;
-      let partySize: number | null = null;
-
-      if (openingNew) {
-        if (
-          qr.table.status !== TableStatus.OCCUPIED &&
-          qr.table.status !== TableStatus.FREE &&
-          qr.table.status !== TableStatus.RESERVED
-        ) {
-          throw new BadRequestException(
-            `Table ${qr.table.number} is not available for seating`,
-          );
-        }
-
-        const requested = dto.partySize ?? 1;
-        if (requested < 1 || requested > seats) {
-          throw new BadRequestException(
-            `Party size must be between 1 and ${seats} for this table`,
-          );
-        }
-        partySize = requested;
-
-        session = await tx.tableSession.create({
-          data: {
-            tableId: qr.tableId,
-            status: SessionStatus.OPEN,
-            guestCount: 0,
-            reservationName: qr.table.reservationName,
-            reservationPartySize: qr.table.reservationPartySize ?? partySize,
-            reservationAt: qr.table.reservationAt,
-            reservationNote: qr.table.reservationNote,
-          },
-          include: { guests: true },
-        });
-
-        await tx.diningTable.update({
-          where: { id: qr.tableId },
-          data: {
-            status: TableStatus.OCCUPIED,
-            reservationName: null,
-            reservationPartySize: null,
-            reservationAt: null,
-            reservationNote: null,
-          },
-        });
-      } else if (qr.table.status === TableStatus.FREE) {
-        await tx.diningTable.update({
-          where: { id: qr.tableId },
-          data: { status: TableStatus.OCCUPIED },
-        });
-      }
+      const partySize: number | null = session.reservationPartySize;
 
       const deviceToken = incomingDevice || randomToken(24);
       // Free this phone from any prior guest rows so unique deviceToken can attach here.
@@ -253,25 +280,25 @@ export class GuestService {
       }
       const guest = await tx.guest.create({
         data: {
-          sessionId: session!.id,
+          sessionId: session.id,
           displayName: dto.displayName?.trim() || null,
           deviceToken,
-          sortOrder: session!.guests.length,
+          sortOrder: session.guests.length,
         },
       });
 
       await tx.tableSession.update({
-        where: { id: session!.id },
+        where: { id: session.id },
         data: { guestCount: { increment: 1 } },
       });
 
       return {
         guestId: guest.id,
-        sessionId: session!.id,
+        sessionId: session.id,
         deviceToken,
         tableId: qr.tableId,
-        openingNew,
-        partySize: openingNew ? partySize : session!.reservationPartySize,
+        openingNew: false as const,
+        partySize,
         seats,
         joinedCount: currentCount + 1,
         resumed: false as const,
@@ -283,13 +310,10 @@ export class GuestService {
         actionType: 'guest.join',
         entityType: 'guest',
         entityId: result.guestId,
-        description: result.openingNew
-          ? `Guest opened table · party of ${result.partySize ?? 1}`
-          : `Guest joined the table`,
+        description: 'Guest joined the table',
         metadata: {
           tableId: result.tableId,
           partySize: result.partySize,
-          openingNew: result.openingNew,
         },
       });
 

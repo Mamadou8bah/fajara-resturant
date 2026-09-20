@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { api, getStoredToken, setStoredToken } from '@/lib/api';
 import { connectSocket, disconnectSocket } from '@/lib/socket';
+import { recordStaffLaunch } from '@/lib/pwaLaunch';
 import {
   ROLE_DEFAULT_ROUTE,
   ROLE_PERMISSIONS,
@@ -88,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         sessionId: payload.sessionId,
       });
       setUser(u);
+      recordStaffLaunch();
       connectSocket(accessToken);
       return u;
     },
@@ -126,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         sessionId: me.sessionId,
       }),
     );
+    recordStaffLaunch();
     connectSocket(t);
   }, [clearSession]);
 

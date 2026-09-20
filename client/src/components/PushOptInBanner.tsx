@@ -83,7 +83,9 @@ export function PushOptInBanner({
           <p className="text-sm font-bold">Get alerts on this iPhone</p>
           <p className="mt-1 text-sm text-muted">
             Tap Share, then <span className="font-semibold">Add to Home Screen</span>.
-            Open the app from that icon, then turn on alerts.
+            Open from that icon (not Safari) to turn on alerts. If an older icon still
+            opens staff login, remove it and add again from your table QR — the Home
+            Screen app opens your latest table.
           </p>
           <div className="mt-3 flex gap-2">
             <Button

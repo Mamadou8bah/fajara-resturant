@@ -22,6 +22,22 @@ export class GuestController {
     return this.guest.resolveMenuByToken(token);
   }
 
+  /** Stable sticker path: resolve menu by dining table UUID. */
+  @Get('menu-by-table/:tableId')
+  @Public()
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  menuByTable(@Param('tableId') tableId: string) {
+    return this.guest.resolveMenuByTableId(tableId);
+  }
+
+  /** Stable sticker path: table UUID → active internal token. */
+  @Get('by-table/:tableId')
+  @Public()
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  resolveByTableId(@Param('tableId') tableId: string) {
+    return this.guest.resolveByTableId(tableId);
+  }
+
   @Get('table/:number')
   @Public()
   @Throttle({ default: { limit: 60, ttl: 60_000 } })

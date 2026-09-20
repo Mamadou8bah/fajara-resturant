@@ -573,14 +573,7 @@ export class PaymentsService {
     if (guestIds.length > 0) {
       const tableId =
         transaction.created.session?.table?.id ?? transaction.tableId;
-      const qr = tableId
-        ? await this.prisma.tableQrToken.findFirst({
-            where: { tableId, isActive: true },
-            orderBy: { createdAt: 'desc' },
-            select: { token: true },
-          })
-        : null;
-      const guestPath = qr?.token ? `/m/${qr.token}` : '/m';
+      const guestPath = tableId ? `/t/${tableId}` : '/';
       const totalLabel = String(transaction.billTotal);
       const txnLabel = transaction.created.transactionNumber;
       await Promise.all(

@@ -32,7 +32,11 @@ function isGuestMenuApi(url) {
 }
 
 function isGuestPage(url) {
-  return url.pathname.startsWith('/m/') || url.pathname.startsWith('/guest');
+  return (
+    url.pathname.startsWith('/m/') ||
+    url.pathname.startsWith('/t/') ||
+    url.pathname.startsWith('/guest')
+  );
 }
 
 self.addEventListener('fetch', (event) => {
