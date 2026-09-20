@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { GuestShell } from '@/components/GuestShell';
+import { PushOptInBanner } from '@/components/PushOptInBanner';
 import {
   IconCart,
   IconOrders,
@@ -131,6 +132,9 @@ export function GuestMenuScreen({ token }: { token: string }) {
     setSession,
     clearSession,
     loadForToken,
+    getOrCreateDeviceToken,
+    rememberDeviceToken,
+    clearOtherTableSessions,
     loadCart,
     saveCart,
     clearCart,
@@ -144,6 +148,7 @@ export function GuestMenuScreen({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [callBusy, setCallBusy] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [partySize, setPartySize] = useState(1);
   useCriticalForm(busy || cart.length > 0);
@@ -218,9 +223,9 @@ export function GuestMenuScreen({ token }: { token: string }) {
           setPrior(await fetchPriorOrders(token, existing.deviceToken));
         } catch (e) {
           const msg = e instanceof Error ? e.message : '';
-          // Visit ended (table cleared / paid) — force a fresh join.
+          // Only drop the visit when the server says it is truly gone.
           if (
-            /active visit|device|session|not found|does not match|required/i.test(
+            /no active visit|does not match this table|guest device not found/i.test(
               msg,
             )
           ) {
@@ -600,7 +605,10 @@ export function GuestMenuScreen({ token }: { token: string }) {
       const res = await guestJoin(token, {
         displayName: name || undefined,
         partySize: opening ? partySize : undefined,
+        deviceToken: getOrCreateDeviceToken(),
       });
+      rememberDeviceToken(res.deviceToken);
+      clearOtherTableSessions(token);
       setSession({
         token,
         guestId: res.guestId,
@@ -712,13 +720,15 @@ export function GuestMenuScreen({ token }: { token: string }) {
     }
     setBusy(true);
     setError(null);
-    try {
+    const clientRequestId = newClientRequestId();
+
+    const placeWith = async (guestId: string) => {
       await guestSubmitOrder({
-        clientRequestId: newClientRequestId(),
+        clientRequestId,
         token,
-        guestId: session.guestId,
+        guestId,
         items: cart.map((line) => ({
-          guestId: session.guestId,
+          guestId,
           menuItemId: line.menuItemId,
           quantity: line.quantity,
           kitchenNotes: line.kitchenNotes,
@@ -728,22 +738,56 @@ export function GuestMenuScreen({ token }: { token: string }) {
             : undefined,
         })),
       });
+    };
+
+    try {
+      let guestId = session.guestId;
+      let deviceToken = session.deviceToken;
+      try {
+        await placeWith(guestId);
+      } catch (first) {
+        const msg = first instanceof Error ? first.message : '';
+        // Stale guest row on an still-open table — resume this phone and retry once.
+        if (/not on this session|seat on this table expired/i.test(msg)) {
+          const res = await guestJoin(token, {
+            displayName: session.displayName ?? undefined,
+            deviceToken: getOrCreateDeviceToken(),
+          });
+          rememberDeviceToken(res.deviceToken);
+          guestId = res.guestId;
+          deviceToken = res.deviceToken;
+          setSession({
+            token,
+            guestId: res.guestId,
+            sessionId: res.sessionId,
+            deviceToken: res.deviceToken,
+            displayName: session.displayName ?? null,
+          });
+          await placeWith(guestId);
+        } else {
+          throw first;
+        }
+      }
       setCart([]);
       clearCart(token);
       setView('orders');
       setToast('Order placed — staff will send it to the kitchen');
-      const p = await fetchPriorOrders(token, session.deviceToken);
-      setPrior(p);
+      try {
+        setPrior(await fetchPriorOrders(token, deviceToken));
+      } catch {
+        /* order already placed — keep guest in the visit */
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Order failed';
+      // Only drop the visit when the table truly has no open seating left.
       if (
-        /not on this session|no open session|session is not open|guestId|expired|join again/i.test(
+        /no open session for this table|session is not open|no active visit|table .* is not available|table is full/i.test(
           msg,
         )
       ) {
         clearSession(token);
         setCart([]);
-        setError('This table visit ended. Join again to place an order.');
+        setError('This table visit ended. Join again when you are seated.');
       } else {
         setError(msg);
       }
@@ -758,7 +802,7 @@ export function GuestMenuScreen({ token }: { token: string }) {
       setError('You are offline. Reconnect to call a waiter.');
       return;
     }
-    setBusy(true);
+    setCallBusy(true);
     setError(null);
     try {
       await guestCallWaiter(token, session.guestId);
@@ -766,7 +810,7 @@ export function GuestMenuScreen({ token }: { token: string }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not call waiter');
     } finally {
-      setBusy(false);
+      setCallBusy(false);
     }
   }
 
@@ -918,6 +962,8 @@ export function GuestMenuScreen({ token }: { token: string }) {
       <Button
         className="w-full"
         disabled={busy || cart.length === 0 || !online}
+        busy={busy}
+        busyLabel="Placing order…"
         onClick={() => void onSubmitOrder()}
       >
         {!online
@@ -1009,25 +1055,16 @@ export function GuestMenuScreen({ token }: { token: string }) {
                   className="h-20 w-20 rounded-3xl bg-[#EDE6DA] object-contain p-2"
                 />
               </div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-muted">
-                Welcome to
-              </p>
-              <p className="mt-1 font-display text-3xl font-extrabold text-ink">
+              <p className="font-display text-3xl font-extrabold text-ink">
                 {brandName}
               </p>
-              <p className="mt-2 text-base text-muted">{tableLabel}</p>
-              <p className="mt-1 text-sm text-muted">
-                {seats} seat{seats === 1 ? '' : 's'}
-                {!opening
-                  ? ` · ${menu.table.joinedCount} already here · ${remaining} left`
-                  : null}
-              </p>
+              {tableLabel ? (
+                <p className="mt-2 text-base text-muted">{tableLabel}</p>
+              ) : null}
               <p className="mt-3 text-sm text-muted">
                 {tableFull
-                  ? 'This table is full — ask staff for another table.'
-                  : opening
-                    ? 'Tell us your name and how many people are with you. Others can scan the same QR too.'
-                    : 'This table already has an open visit. Join with an optional name.'}
+                  ? 'This table is full — please ask a member of staff.'
+                  : 'Enter your name to start ordering.'}
               </p>
             </div>
             {joinError ? (
@@ -1083,22 +1120,15 @@ export function GuestMenuScreen({ token }: { token: string }) {
                         +
                       </button>
                     </div>
-                    <p className="mt-2 text-center text-xs text-muted">
-                      Max {seats} for this table — others can still scan if seats
-                      are free
-                    </p>
                   </div>
                 ) : null}
                 <Button
                   type="submit"
                   className="w-full text-base"
-                  disabled={busy}
+                  busy={busy}
+                  busyLabel="Joining…"
                 >
-                  {busy
-                    ? 'Joining…'
-                    : opening
-                      ? 'Continue to menu'
-                      : 'Join this table'}
+                  {opening ? 'Continue' : 'Start ordering'}
                 </Button>
               </>
             ) : null}
@@ -1117,7 +1147,7 @@ export function GuestMenuScreen({ token }: { token: string }) {
       subtitle={subtitle}
       joined
       onCallWaiter={() => void onCallWaiter()}
-      callBusy={busy}
+      callBusy={callBusy}
       footer={footer}
       cartBar={cartBar}
       hideBottomChrome={Boolean(picked)}
@@ -1127,6 +1157,16 @@ export function GuestMenuScreen({ token }: { token: string }) {
         <p className="mb-3 mt-3 rounded-2xl bg-[#DCEBE4] px-4 py-3 text-sm font-medium text-ready">
           {toast}
         </p>
+      ) : null}
+      {session?.guestId && session.deviceToken ? (
+        <PushOptInBanner
+          audience={{
+            kind: 'guest',
+            guestId: session.guestId,
+            deviceToken: session.deviceToken,
+          }}
+          className="mb-3 mt-3"
+        />
       ) : null}
       {error ? (
         <ErrorBanner message={error} onClose={() => setError(null)} />
@@ -1238,6 +1278,8 @@ export function GuestMenuScreen({ token }: { token: string }) {
               <Button
                 className="mt-2 w-full text-base"
                 disabled={busy || !online}
+                busy={busy}
+                busyLabel="Placing order…"
                 onClick={() => void onSubmitOrder()}
               >
                 {!online

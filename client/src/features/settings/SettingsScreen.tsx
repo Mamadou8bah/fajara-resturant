@@ -129,7 +129,12 @@ function SectionSave({
   label?: string;
 }) {
   return (
-    <Button className="mt-4" disabled={busy} onClick={onSave}>
+    <Button
+      className="mt-4"
+      busy={busy}
+      busyLabel="Saving…"
+      onClick={onSave}
+    >
       {label}
     </Button>
   );

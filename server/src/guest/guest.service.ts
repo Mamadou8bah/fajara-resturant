@@ -244,6 +244,13 @@ export class GuestService {
       }
 
       const deviceToken = incomingDevice || randomToken(24);
+      // Free this phone from any prior guest rows so unique deviceToken can attach here.
+      if (incomingDevice) {
+        await tx.guest.updateMany({
+          where: { deviceToken: incomingDevice },
+          data: { deviceToken: null },
+        });
+      }
       const guest = await tx.guest.create({
         data: {
           sessionId: session!.id,

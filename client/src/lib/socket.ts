@@ -41,13 +41,20 @@ export function connectSocket(token?: string | null) {
 /** Join (or re-join after reconnect) the rooms a staff user needs. */
 export function joinStaffRooms(
   s: Socket,
-  user: { id: string; role: string },
+  user: { id: string; role: string; permissions?: string[] },
 ) {
   s.emit('join', { room: 'waiters' });
   s.emit('join', { room: 'floor' });
   s.emit('join', { room: `employee:${user.id}` });
   if (user.role === 'OWNER' || user.role === 'MANAGER') {
     s.emit('join', { room: 'managers' });
+  }
+  // Kitchen / grill need KDS tickets even when not looking at the kitchen page.
+  if (
+    user.role === 'KITCHEN' ||
+    user.permissions?.includes('orders.kitchen')
+  ) {
+    s.emit('join', { room: 'kds' });
   }
 }
 

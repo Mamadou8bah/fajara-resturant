@@ -1239,6 +1239,8 @@ export function CheckoutScreen() {
                       <Button
                         className="w-full"
                         disabled={busy || tenders.length === 0}
+                        busy={busy && tenders.length > 0}
+                        busyLabel="Settling…"
                         onClick={() => void onSettle(false)}
                       >
                         Settle split tenders
@@ -1251,6 +1253,8 @@ export function CheckoutScreen() {
                       className="min-h-touch w-full text-base"
                       onClick={() => void onSettle(true)}
                       disabled={busy || bill.lines.length === 0 || splitMode}
+                      busy={busy && !splitMode && bill.lines.length > 0}
+                      busyLabel="Settling…"
                     >
                       {settleGuestId
                         ? `Settle guest · ${formatGmd(live.total)}`
@@ -1321,7 +1325,11 @@ export function CheckoutScreen() {
                     value={openingBalance}
                     onChange={(e) => setOpeningBalance(e.target.value)}
                   />
-                  <Button onClick={onOpenTill} disabled={busy}>
+                  <Button
+                    onClick={onOpenTill}
+                    busy={busy}
+                    busyLabel="Opening…"
+                  >
                     Open till
                   </Button>
                 </div>
@@ -1589,7 +1597,13 @@ export function CheckoutScreen() {
                   onChange={(e) => setRefundReason(e.target.value)}
                 />
               </div>
-              <Button className="mt-3" onClick={onRefund} disabled={busy}>
+              <Button
+                className="mt-3"
+                onClick={onRefund}
+                disabled={busy}
+                busy={busy}
+                busyLabel="Refunding…"
+              >
                 Refund with approval
               </Button>
             </Panel>

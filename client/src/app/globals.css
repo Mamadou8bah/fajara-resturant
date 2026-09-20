@@ -432,6 +432,10 @@ html[data-font='xl'] { font-size: 20px; }
   animation-delay: 0.4s;
 }
 
+.loader-sm {
+  --size: 0.33px;
+}
+
 .loader-lg {
   --size: 1.35px;
 }

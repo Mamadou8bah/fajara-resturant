@@ -78,6 +78,7 @@ export function FloorScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const [guestCount, setGuestCount] = useState(2);
@@ -202,8 +203,9 @@ export function FloorScreen() {
     });
   }, [tables, statusFilter, ownershipFilter, floorQuery, user?.id]);
 
-  async function run(action: () => Promise<unknown>) {
+  async function run(key: string, action: () => Promise<unknown>) {
     setBusy(true);
+    setBusyKey(key);
     setError(null);
     try {
       await action();
@@ -212,6 +214,7 @@ export function FloorScreen() {
       setError(e instanceof Error ? e.message : 'Action failed');
     } finally {
       setBusy(false);
+      setBusyKey(null);
     }
   }
 
@@ -233,7 +236,7 @@ export function FloorScreen() {
       Math.max(1, guestCount),
       selected.seats,
     );
-    await run(() =>
+    await run('open', () =>
       openSession({
         tableId: selected.id,
         waiterId: user?.id,
@@ -250,7 +253,7 @@ export function FloorScreen() {
 
   async function onAddGuest() {
     if (!selected?.activeSession) return;
-    await run(() =>
+    await run('add', () =>
       addGuest(selected.activeSession!.id, guestName.trim() || undefined),
     );
     setGuestName('');
@@ -258,23 +261,23 @@ export function FloorScreen() {
 
   async function onMove() {
     if (!selected?.activeSession || !moveToId) return;
-    await run(() => moveSession(selected.activeSession!.id, moveToId));
+    await run('move', () => moveSession(selected.activeSession!.id, moveToId));
     setMoveToId('');
   }
 
   async function onClean() {
     if (!selected) return;
-    await run(() => markCleaningComplete(selected.id));
+    await run('clean', () => markCleaningComplete(selected.id));
   }
 
   async function onCloseTable() {
     if (!selected?.activeSession) return;
-    await run(() => closeSession(selected.activeSession!.id));
+    await run('close', () => closeSession(selected.activeSession!.id));
   }
 
   async function onSetStatus(status: TableStatus) {
     if (!selected) return;
-    await run(() =>
+    await run(`status:${status}`, () =>
       updateTableStatus(selected.id, {
         status,
         ...(status === 'RESERVED'
@@ -344,6 +347,8 @@ export function FloorScreen() {
             <Button
               className="w-full text-base"
               disabled={busy}
+              busy={busyKey === 'open'}
+              busyLabel="Opening…"
               onClick={() => void onOpenSession()}
             >
               Open table
@@ -358,6 +363,8 @@ export function FloorScreen() {
             <Button
               className="w-full text-base"
               disabled={busy}
+              busy={busyKey === 'clean'}
+              busyLabel="Clearing…"
               onClick={() => void onClean()}
             >
               Clear table (cleaned)
@@ -431,6 +438,8 @@ export function FloorScreen() {
                   <Button
                     className="w-full text-base"
                     disabled={busy || unpaid}
+                    busy={busyKey === 'close'}
+                    busyLabel="Clearing…"
                     onClick={() => void onCloseTable()}
                   >
                     {unpaid ? 'Clear table (pay first)' : 'Clear table'}
@@ -452,7 +461,12 @@ export function FloorScreen() {
                 value={guestName}
                 onChange={(e) => setGuestName(e.target.value)}
               />
-              <Button disabled={busy} onClick={() => void onAddGuest()}>
+              <Button
+                disabled={busy}
+                busy={busyKey === 'add'}
+                busyLabel="Adding…"
+                onClick={() => void onAddGuest()}
+              >
                 Add
               </Button>
             </div>
@@ -479,6 +493,8 @@ export function FloorScreen() {
                   variant="outline"
                   className="w-full"
                   disabled={busy || !moveToId}
+                  busy={busyKey === 'move'}
+                  busyLabel="Moving…"
                   onClick={() => void onMove()}
                 >
                   Move session
@@ -501,6 +517,8 @@ export function FloorScreen() {
                     variant="outline"
                     className="w-full"
                     disabled={busy || selected.status === s}
+                    busy={busyKey === `status:${s}`}
+                    busyLabel="Updating…"
                     onClick={() => void onSetStatus(s)}
                   >
                     {s.replaceAll('_', ' ')}

@@ -195,7 +195,7 @@ export class OrdersService {
     }
 
     try {
-      const order = await this.prisma.$transaction(async (tx) => {
+      const orderMeta = await this.prisma.$transaction(async (tx) => {
         const session = await tx.tableSession.findUnique({
           where: { id: input.sessionId },
           include: { guests: true },
@@ -440,33 +440,29 @@ export class OrdersService {
           include: ORDER_INCLUDE,
         });
 
-        await this.activity.record({
-          actorId: actorId ?? waiterId ?? null,
-          actionType: 'order.placed',
-          entityType: 'order',
-          entityId: order.id,
-          description:
-            input.source === OrderSource.GUEST
-              ? `Order ${order.orderNumber} placed by guest`
-              : anyKitchen
-                ? `Order ${order.orderNumber} placed by waiter (kitchen hold)`
-                : `Order ${order.orderNumber} placed — service only (no kitchen)`,
-          metadata: {
-            sessionId: session.id,
-            itemCount: preparedLines.length,
-            kitchenCount: preparedLines.filter((l) => l.requiresKitchen).length,
-            serviceCount: preparedLines.filter((l) => !l.requiresKitchen).length,
-            specials: preparedLines
-              .filter((l) => l.specialId)
-              .map((l) => ({
-                specialId: l.specialId,
-                quantity: l.specialQty,
-              })),
-          },
-        });
+        return { order, anyKitchen, waiterId };
+      },
+      { maxWait: 10_000, timeout: 20_000 },
+      );
 
-        return order;
+      await this.activity.record({
+        actorId: actorId ?? orderMeta.waiterId ?? null,
+        actionType: 'order.placed',
+        entityType: 'order',
+        entityId: orderMeta.order.id,
+        description:
+          input.source === OrderSource.GUEST
+            ? `Order ${orderMeta.order.orderNumber} placed by guest`
+            : orderMeta.anyKitchen
+              ? `Order ${orderMeta.order.orderNumber} placed by waiter (kitchen hold)`
+              : `Order ${orderMeta.order.orderNumber} placed — service only (no kitchen)`,
+        metadata: {
+          sessionId: orderMeta.order.sessionId,
+          itemCount: orderMeta.order.items.length,
+        },
       });
+
+      const order = orderMeta.order;
 
       // Safety net if menu flags changed mid-flight.
       const afterRelease = await this.releaseNonKitchenItems(

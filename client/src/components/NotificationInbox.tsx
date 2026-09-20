@@ -248,29 +248,29 @@ export function NotificationInbox() {
                       {canClaim && canAccept(n) ? (
                         <Button
                           className="mt-3 w-full"
-                          disabled={busyId === n.id}
+                          disabled={busyId !== null && busyId !== n.id}
+                          busy={busyId === n.id}
+                          busyLabel="Assigning…"
                           onClick={() => void onAccept(n)}
                         >
-                          {busyId === n.id
-                            ? 'Assigning…'
-                            : 'Accept & assign to me'}
+                          Accept & assign to me
                         </Button>
                       ) : null}
                       {canApprove && canApproveException(n) ? (
                         <div className="mt-3 flex gap-2">
                           <Button
                             className="flex-1"
-                            disabled={busyId === n.id}
+                            disabled={busyId !== null && busyId !== n.id}
+                            busy={busyId === n.id}
+                            busyLabel="Approving…"
                             onClick={() => void onApproveException(n)}
                           >
-                            {busyId === n.id
-                              ? '…'
-                              : `Approve ${exceptionActionLabel(n.type)}`}
+                            {`Approve ${exceptionActionLabel(n.type)}`}
                           </Button>
                           <Button
                             variant="outline"
                             className="flex-1"
-                            disabled={busyId === n.id}
+                            disabled={busyId !== null}
                             onClick={() => void onDeclineException(n)}
                           >
                             Decline

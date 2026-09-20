@@ -35,7 +35,7 @@ Auth: `Authorization: Bearer <accessToken>` unless marked public.
 - **Reports** `/reports` — dashboard (REP-001), sales-trend (REP-002), margins, yield-variance, EOD, sales history (`mine` / `cashierId` scope), cashier-summary, CSV, handoff JSON
 - **Retention** `/retention/anonymize-guest-names` — SEC-010 guest display-name anonymize
 - **Audit** `/audit/activity` — insert-only activity log
-- **Notifications** `/notifications` — list; `PATCH :id/delivered`, `PATCH :id/seen`, resolve
+- **Notifications** `/notifications` — list; `PATCH :id/delivered`, `PATCH :id/seen`, resolve; Web Push: `GET /notifications/push/vapid-public-key` (public), `POST /notifications/push/subscribe` (staff), `POST /notifications/push/subscribe/guest` (public + deviceToken), unsubscribe variants
 - **Settings** `/settings` — public subset + Owner manage
 - **Health** `/health`
 

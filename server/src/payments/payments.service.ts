@@ -265,7 +265,12 @@ export class PaymentsService {
       allowedMethods.map((m) => [m.trim().toLowerCase(), m.trim()]),
     );
 
-    const transaction = await this.prisma.$transaction(async (tx) => {
+    // Load outside the interactive transaction — Neon + settings reads inside
+    // a 5s FOR UPDATE txn is what tripped settle timeouts in UAT.
+    const requireCleaning = await this.sessions.requireCleaningAfterClose();
+
+    const transaction = await this.prisma.$transaction(
+      async (tx) => {
       await tx.$executeRaw`
         SELECT id FROM table_sessions WHERE id = ${dto.sessionId}::uuid FOR UPDATE
       `;
@@ -483,8 +488,6 @@ export class PaymentsService {
       let tableStatusAfter: TableStatus | null = null;
       if (remainingSessionItems === 0) {
         // SES-003: fully paid visit closes and enters cleaning (or Free if disabled).
-        const requireCleaning =
-          await this.sessions.requireCleaningAfterClose();
         tableStatusAfter = await this.sessions.finalizeSettledSessionInTx(
           tx,
           session.id,
@@ -514,24 +517,39 @@ export class PaymentsService {
         }
       }
 
-      await this.activity.record({
-        actorId: cashierId,
-        actionType: 'payment.settle',
-        entityType: 'transaction',
-        entityId: created.id,
-        description: `Bill ${created.transactionNumber} paid · ${bill.total}`,
-        metadata: {
-          sessionId: session.id,
-          guestId: dto.guestId ?? null,
-          methods: paymentRows.map((p) => p.method),
-          discountApproverId,
-          itemIds: billableItems.map((i) => i.id),
-          sessionSettled: remainingSessionItems === 0,
-          tableStatusAfter,
-        },
-      });
+      return {
+        created,
+        tableStatusAfter,
+        sessionId: session.id,
+        tableId: session.tableId,
+        billTotal: bill.total,
+        paymentMethods: paymentRows.map((p) => p.method),
+        itemIds: billableItems.map((i) => i.id),
+        sessionSettled: remainingSessionItems === 0,
+      };
+    },
+      {
+        // Neon / remote Postgres can exceed the default 5s interactive timeout.
+        maxWait: 10_000,
+        timeout: 20_000,
+      },
+    );
 
-      return { created, tableStatusAfter, sessionId: session.id, tableId: session.tableId };
+    await this.activity.record({
+      actorId: cashierId,
+      actionType: 'payment.settle',
+      entityType: 'transaction',
+      entityId: transaction.created.id,
+      description: `Bill ${transaction.created.transactionNumber} paid · ${transaction.billTotal}`,
+      metadata: {
+        sessionId: transaction.sessionId,
+        guestId: dto.guestId ?? null,
+        methods: transaction.paymentMethods,
+        discountApproverId,
+        itemIds: transaction.itemIds,
+        sessionSettled: transaction.sessionSettled,
+        tableStatusAfter: transaction.tableStatusAfter,
+      },
     });
 
     const payload = jsonSafe(transaction.created);
@@ -568,7 +586,8 @@ export class PaymentsService {
       dto.approverPin,
     );
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(
+      async (tx) => {
       const txn = await tx.transaction.findUnique({
         where: { id: dto.transactionId },
         include: { refunds: true, payments: true },
@@ -625,20 +644,28 @@ export class PaymentsService {
         });
       }
 
-      await this.activity.record({
-        actorId: actor.id,
-        actionType: 'payment.refund',
-        entityType: 'refund',
-        entityId: refund.id,
-        description: `Refund ${fromCents(refundCents)} · bill ${txn.transactionNumber}`,
-        metadata: {
-          transactionId: txn.id,
-          approvedById: approver.id,
-          reason: dto.reason,
-        },
-      });
+      return {
+        refund,
+        transactionId: txn.id,
+        sessionId: txn.sessionId,
+        transactionNumber: txn.transactionNumber,
+        refundCents,
+      };
+    },
+      { maxWait: 10_000, timeout: 20_000 },
+    );
 
-      return { refund, transactionId: txn.id, sessionId: txn.sessionId };
+    await this.activity.record({
+      actorId: actor.id,
+      actionType: 'payment.refund',
+      entityType: 'refund',
+      entityId: result.refund.id,
+      description: `Refund ${fromCents(result.refundCents)} · bill ${result.transactionNumber}`,
+      metadata: {
+        transactionId: result.transactionId,
+        approvedById: approver.id,
+        reason: dto.reason,
+      },
     });
 
     this.realtime.emitToRoom('floor', 'payment.refunded', result.refund);
@@ -704,6 +731,7 @@ export class PaymentsService {
         });
         return [updatedPayment, created] as const;
       },
+      { maxWait: 10_000, timeout: 20_000 },
     );
 
     await this.activity.record({

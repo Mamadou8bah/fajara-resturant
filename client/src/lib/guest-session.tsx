@@ -12,6 +12,7 @@ import type { GuestCartLine, GuestMenuResponse } from '@/features/guest/api';
 
 const GUEST_KEY = 'fajara_guest_session';
 const CART_KEY = 'fajara_guest_cart';
+const DEVICE_KEY = 'fajara_guest_device';
 const MENU_CACHE_PREFIX = 'fajara_guest_menu:';
 
 export type GuestSession = {
@@ -27,6 +28,9 @@ type GuestCtx = {
   setSession: (s: GuestSession | null) => void;
   clearSession: (qrToken?: string) => void;
   loadForToken: (qrToken: string) => GuestSession | null;
+  getOrCreateDeviceToken: () => string;
+  rememberDeviceToken: (deviceToken: string) => void;
+  clearOtherTableSessions: (keepToken: string) => void;
   loadCart: (qrToken: string) => GuestCartLine[];
   saveCart: (qrToken: string, cart: GuestCartLine[]) => void;
   clearCart: (qrToken: string) => void;
@@ -67,24 +71,34 @@ function writeJson(key: string, value: unknown) {
   }
 }
 
-function readAllSessions(): Record<string, GuestSession> {
-  // Migrate from sessionStorage once if present.
+function writeAllSessions(map: Record<string, GuestSession>) {
+  writeJson(GUEST_KEY, map);
+  // Mirror to sessionStorage so a brief localStorage blip on mobile
+  // does not drop the visit mid-order.
   if (typeof window !== 'undefined') {
     try {
-      const legacy = sessionStorage.getItem(GUEST_KEY);
-      if (legacy && !localStorage.getItem(GUEST_KEY)) {
-        localStorage.setItem(GUEST_KEY, legacy);
-        sessionStorage.removeItem(GUEST_KEY);
+      sessionStorage.setItem(GUEST_KEY, JSON.stringify(map));
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function readAllSessions(): Record<string, GuestSession> {
+  if (typeof window !== 'undefined') {
+    try {
+      const fromLocal = localStorage.getItem(GUEST_KEY);
+      const fromSession = sessionStorage.getItem(GUEST_KEY);
+      if (!fromLocal && fromSession) {
+        localStorage.setItem(GUEST_KEY, fromSession);
+      } else if (fromLocal && !fromSession) {
+        sessionStorage.setItem(GUEST_KEY, fromLocal);
       }
     } catch {
       /* ignore */
     }
   }
   return readJson(GUEST_KEY, {});
-}
-
-function writeAllSessions(map: Record<string, GuestSession>) {
-  writeJson(GUEST_KEY, map);
 }
 
 function readAllCarts(): Record<string, GuestCartLine[]> {
@@ -98,12 +112,15 @@ function writeAllCarts(map: Record<string, GuestCartLine[]>) {
 export function GuestSessionProvider({ children }: { children: ReactNode }) {
   const [session, setSessionState] = useState<GuestSession | null>(null);
 
-  const setSession = useCallback((s: GuestSession | null) => {
-    setSessionState(s);
-    if (!s) return;
-    const all = readAllSessions();
-    all[s.token] = s;
-    writeAllSessions(all);
+  const rememberDeviceToken = useCallback((deviceToken: string) => {
+    const s = storage();
+    if (!s || !deviceToken.trim()) return;
+    try {
+      s.setItem(DEVICE_KEY, deviceToken.trim());
+      sessionStorage.setItem(DEVICE_KEY, deviceToken.trim());
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   const clearCart = useCallback((qrToken: string) => {
@@ -113,6 +130,69 @@ export function GuestSessionProvider({ children }: { children: ReactNode }) {
       writeAllCarts(carts);
     }
   }, []);
+
+  const setSession = useCallback(
+    (s: GuestSession | null) => {
+      setSessionState(s);
+      if (!s) return;
+      const all = readAllSessions();
+      // One phone → one active table visit locally.
+      for (const key of Object.keys(all)) {
+        if (key !== s.token) {
+          delete all[key];
+          clearCart(key);
+        }
+      }
+      all[s.token] = s;
+      writeAllSessions(all);
+      rememberDeviceToken(s.deviceToken);
+    },
+    [clearCart, rememberDeviceToken],
+  );
+
+  const getOrCreateDeviceToken = useCallback(() => {
+    const s = storage();
+    try {
+      const existing = s?.getItem(DEVICE_KEY)?.trim();
+      if (existing && existing.length >= 8) return existing;
+      const fromSession = sessionStorage.getItem(DEVICE_KEY)?.trim();
+      if (fromSession && fromSession.length >= 8) {
+        rememberDeviceToken(fromSession);
+        return fromSession;
+      }
+    } catch {
+      /* ignore */
+    }
+    const all = readAllSessions();
+    for (const row of Object.values(all)) {
+      if (row.deviceToken?.trim()) {
+        rememberDeviceToken(row.deviceToken);
+        return row.deviceToken.trim();
+      }
+    }
+    const created =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID().replace(/-/g, '')
+        : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+    rememberDeviceToken(created);
+    return created;
+  }, [rememberDeviceToken]);
+
+  const clearOtherTableSessions = useCallback(
+    (keepToken: string) => {
+      const all = readAllSessions();
+      let changed = false;
+      for (const key of Object.keys(all)) {
+        if (key !== keepToken) {
+          delete all[key];
+          changed = true;
+          clearCart(key);
+        }
+      }
+      if (changed) writeAllSessions(all);
+    },
+    [clearCart],
+  );
 
   const clearSession = useCallback(
     (qrToken?: string) => {
@@ -181,6 +261,9 @@ export function GuestSessionProvider({ children }: { children: ReactNode }) {
       setSession,
       clearSession,
       loadForToken,
+      getOrCreateDeviceToken,
+      rememberDeviceToken,
+      clearOtherTableSessions,
       loadCart,
       saveCart,
       clearCart,
@@ -192,6 +275,9 @@ export function GuestSessionProvider({ children }: { children: ReactNode }) {
       setSession,
       clearSession,
       loadForToken,
+      getOrCreateDeviceToken,
+      rememberDeviceToken,
+      clearOtherTableSessions,
       loadCart,
       saveCart,
       clearCart,

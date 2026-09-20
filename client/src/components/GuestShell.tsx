@@ -87,12 +87,23 @@ export function GuestShell({
                 disabled={waiterDisabled}
                 onClick={onCallWaiter}
                 title={!online ? 'Reconnect to call a waiter' : undefined}
+                aria-busy={callBusy || undefined}
                 className="flex min-h-[48px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-2xl bg-[#EDE6DA] px-3 py-2 text-ink transition active:scale-[0.97] disabled:opacity-60"
-                aria-label={!online ? 'Call waiter (offline)' : 'Call waiter'}
+                aria-label={
+                  callBusy
+                    ? 'Calling waiter'
+                    : !online
+                      ? 'Call waiter (offline)'
+                      : 'Call waiter'
+                }
               >
-                <IconBell className="h-5 w-5 text-cta" />
+                {callBusy ? (
+                  <span className="loader loader-sm" aria-hidden />
+                ) : (
+                  <IconBell className="h-5 w-5 text-cta" />
+                )}
                 <span className="text-[10px] font-bold uppercase tracking-wide text-muted">
-                  Waiter
+                  {callBusy ? 'Calling…' : 'Waiter'}
                 </span>
               </button>
             ) : null}

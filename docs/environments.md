@@ -86,6 +86,7 @@ Local defaults (full values live in `server/.env.staging.example` / `client/.env
 4. **Cross-link CORS**
    - On Render: `CORS_ORIGIN` + `PUBLIC_WEB_URL` = `https://<site>.netlify.app`
 5. Device smoke against the Netlify HTTPS origin (SEC-001). Templates: `server/.env.staging.hosted.example`, `client/.env.staging.hosted.example`.
+6. Set **VAPID** keys on Render (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`) after `npx web-push generate-vapid-keys`. Confirm push opt-in on staff PWA and guest Home Screen (iOS 16.4+).
 
 **Note:** `preDeployCommand` needs a paid Render plan (e.g. starter). Free/idle web services sleep — first request after sleep can be slow; Socket.IO reconnects on wake.
 

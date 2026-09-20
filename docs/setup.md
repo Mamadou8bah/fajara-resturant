@@ -62,6 +62,37 @@ pnpm dev
 
 See [docs/environments.md](./environments.md).
 
+## Web Push (closed-browser / iOS alerts)
+
+Staff and guests can receive OS notifications when the browser tab is closed. Uses VAPID Web Push (no Firebase).
+
+1. Generate keys (once per environment):
+
+```bash
+cd server
+npx web-push generate-vapid-keys
+```
+
+2. Set on the API (`server/.env` or Render env):
+
+- `VAPID_PUBLIC_KEY`
+- `VAPID_PRIVATE_KEY`
+- `VAPID_SUBJECT` (e.g. `mailto:ops@yourdomain`)
+
+3. Client reads the public key from `GET /api/notifications/push/vapid-public-key` — do not put the private key on Netlify.
+
+4. Run migrations so `push_subscriptions` exists (`pnpm migrate:deploy`).
+
+### iOS checklist (iPhone / iPad, iOS 16.4+)
+
+1. Open the HTTPS site in Safari.
+2. Share → **Add to Home Screen**.
+3. Open the app from that Home Screen icon (not a Safari tab).
+4. Tap **Enable** on the alerts banner and allow notifications.
+5. Close the PWA fully, then trigger an event (guest call / order ready) and confirm the OS banner.
+
+Android / desktop Chromium can enable alerts without installing; HTTPS is still required except on localhost.
+
 ## Prototype
 
 [`docs/Fajara Restaurant Services.html`](./Fajara%20Restaurant%20Services.html)

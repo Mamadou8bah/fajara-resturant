@@ -87,6 +87,9 @@ export function OrdersScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [reassigningId, setReassigningId] = useState<string | null>(null);
+  const [sendingOrderId, setSendingOrderId] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [addItemsOpen, setAddItemsOpen] = useState(false);
@@ -324,6 +327,7 @@ export function OrdersScreen() {
       return;
     }
     setBusy(true);
+    setBusyKey('clear');
     setError(null);
     try {
       await closeSession(selected.id);
@@ -334,6 +338,7 @@ export function OrdersScreen() {
       setError(e instanceof Error ? e.message : 'Could not clear table');
     } finally {
       setBusy(false);
+      setBusyKey(null);
     }
   }
 
@@ -441,6 +446,7 @@ export function OrdersScreen() {
     }
     const clientRequestId = submitRequestIdRef.current;
     setBusy(true);
+    setBusyKey('submit');
     setError(null);
     setFlash(null);
     try {
@@ -470,6 +476,7 @@ export function OrdersScreen() {
       setError(e instanceof Error ? e.message : 'Submit failed');
     } finally {
       setBusy(false);
+      setBusyKey(null);
     }
   }
 
@@ -521,6 +528,7 @@ export function OrdersScreen() {
 
   async function onAccept(n: StaffNotification) {
     setBusy(true);
+    setBusyKey(`accept:${n.id}`);
     setError(null);
     try {
       await firstAccept({
@@ -533,6 +541,7 @@ export function OrdersScreen() {
       setError(e instanceof Error ? e.message : 'Accept failed');
     } finally {
       setBusy(false);
+      setBusyKey(null);
     }
   }
 
@@ -541,7 +550,7 @@ export function OrdersScreen() {
       setError('You are offline — connect to send orders to the kitchen.');
       return;
     }
-    setBusy(true);
+    setSendingOrderId(orderId);
     setError(null);
     try {
       await sendOrderToKitchen(orderId, itemIds);
@@ -559,7 +568,7 @@ export function OrdersScreen() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Send failed');
     } finally {
-      setBusy(false);
+      setSendingOrderId(null);
     }
   }
 
@@ -579,6 +588,7 @@ export function OrdersScreen() {
 
   async function onServeItem(itemId: string) {
     setBusy(true);
+    setBusyKey(`serve:${itemId}`);
     setError(null);
     try {
       await serveOrderItem(itemId);
@@ -588,12 +598,13 @@ export function OrdersScreen() {
       setError(e instanceof Error ? e.message : 'Serve failed');
     } finally {
       setBusy(false);
+      setBusyKey(null);
     }
   }
 
   async function onReassign(sid: string, waiterId: string) {
     if (!waiterId) return;
-    setBusy(true);
+    setReassigningId(sid);
     setError(null);
     try {
       await assignSessionWaiter(sid, waiterId);
@@ -602,7 +613,7 @@ export function OrdersScreen() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Reassign failed');
     } finally {
-      setBusy(false);
+      setReassigningId(null);
     }
   }
 
@@ -673,6 +684,8 @@ export function OrdersScreen() {
       <Button
         className="w-full text-base"
         disabled={busy || cart.length === 0 || !selected}
+        busy={busyKey === 'submit'}
+        busyLabel="Sending…"
         onClick={() => void onSubmit()}
       >
         Send to kitchen
@@ -694,6 +707,8 @@ export function OrdersScreen() {
             variant="outline"
             className="mt-3 w-full"
             disabled={busy}
+            busy={busyKey === 'clear'}
+            busyLabel="Clearing…"
             onClick={() => void onClearTable()}
           >
             Clear my table
@@ -830,6 +845,8 @@ export function OrdersScreen() {
                     <Button
                       className="shrink-0"
                       disabled={busy}
+                      busy={busyKey === `accept:${n.id}`}
+                      busyLabel="Accepting…"
                       onClick={() => void onAccept(n)}
                     >
                       Accept
@@ -919,14 +936,26 @@ export function OrdersScreen() {
                       </div>
                       <div className="flex flex-col gap-2">
                         <Button
-                          disabled={busy || selected.length === 0}
+                          disabled={
+                            busy ||
+                            sendingOrderId === o.id ||
+                            selected.length === 0
+                          }
+                          busy={sendingOrderId === o.id}
+                          busyLabel="Sending…"
                           onClick={() => void onSendPlaced(o.id, selected)}
                         >
                           Send selected
                         </Button>
                         <Button
                           variant="outline"
-                          disabled={busy || kitchenHeld.length === 0}
+                          disabled={
+                            busy ||
+                            sendingOrderId === o.id ||
+                            kitchenHeld.length === 0
+                          }
+                          busy={sendingOrderId === o.id}
+                          busyLabel="Sending…"
                           onClick={() =>
                             void onSendPlaced(
                               o.id,
@@ -941,26 +970,34 @@ export function OrdersScreen() {
                     {isManager ? (
                       <Can anyOf={['session.move']}>
                         {waiters.length > 0 ? (
-                          <label className="mt-2 block text-xs font-semibold text-muted">
-                            Reassign
-                            <select
-                              className="input-field mt-1 text-sm"
-                              value={s.waiterId ?? ''}
-                              disabled={busy}
-                              onChange={(e) =>
-                                void onReassign(s.id, e.target.value)
-                              }
-                            >
-                              <option value="" disabled>
-                                Choose waiter
-                              </option>
-                              {waiters.map((w) => (
-                                <option key={w.id} value={w.id}>
-                                  {w.fullName}
+                          <div className="mt-2">
+                            <label className="block text-xs font-semibold text-muted">
+                              Reassign
+                              <select
+                                className="input-field mt-1 text-sm"
+                                value={s.waiterId ?? ''}
+                                disabled={busy || reassigningId === s.id}
+                                onChange={(e) =>
+                                  void onReassign(s.id, e.target.value)
+                                }
+                              >
+                                <option value="" disabled>
+                                  Choose waiter
                                 </option>
-                              ))}
-                            </select>
-                          </label>
+                                {waiters.map((w) => (
+                                  <option key={w.id} value={w.id}>
+                                    {w.fullName}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            {reassigningId === s.id ? (
+                              <p className="mt-2 flex items-center gap-2 text-xs font-semibold text-muted">
+                                <span className="loader loader-sm" aria-hidden />
+                                Reassigning waiter…
+                              </p>
+                            ) : null}
+                          </div>
                         ) : null}
                       </Can>
                     ) : null}
@@ -1023,6 +1060,8 @@ export function OrdersScreen() {
                               {it.status === 'ready' ? (
                                 <Button
                                   disabled={busy}
+                                  busy={busyKey === `serve:${it.id}`}
+                                  busyLabel="Serving…"
                                   onClick={() => void onServeItem(it.id)}
                                 >
                                   Serve
@@ -1264,7 +1303,9 @@ export function OrdersScreen() {
                                 </p>
                                 {o.items.some((i) => i.status === 'placed') ? (
                                   <Button
-                                    disabled={busy}
+                                    disabled={busy || sendingOrderId === o.id}
+                                    busy={sendingOrderId === o.id}
+                                    busyLabel="Sending…"
                                     onClick={() => void onSendPlaced(o.id)}
                                   >
                                     Send held items
@@ -1286,6 +1327,8 @@ export function OrdersScreen() {
                                     {it.status === 'ready' ? (
                                       <Button
                                         disabled={busy}
+                                        busy={busyKey === `serve:${it.id}`}
+                                        busyLabel="Serving…"
                                         onClick={() => void onServeItem(it.id)}
                                       >
                                         Serve

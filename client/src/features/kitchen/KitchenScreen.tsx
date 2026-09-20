@@ -200,6 +200,8 @@ function TicketCard({
                 <Button
                   className="min-h-14 w-full text-lg font-bold"
                   disabled={busyId === item.id || busy}
+                  busy={busyId === item.id}
+                  busyLabel="Updating…"
                   onClick={() => void onTransition(item, next)}
                 >
                   {nextLabel}
@@ -241,6 +243,8 @@ function TicketCard({
           <Button
             className="min-h-14 w-full text-base font-bold"
             disabled={busy}
+            busy={busy}
+            busyLabel="Updating…"
             onClick={() => void onAdvanceGroup(group, next)}
           >
             {nextLabel} all ({group.length})

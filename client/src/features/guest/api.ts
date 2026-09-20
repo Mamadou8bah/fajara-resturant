@@ -211,11 +211,16 @@ export function optionPriceDelta(o: GuestMenuOption): number {
 
 export function guestJoin(
   token: string,
-  opts?: { displayName?: string; partySize?: number },
+  opts?: { displayName?: string; partySize?: number; deviceToken?: string },
 ) {
-  const body: { displayName?: string; partySize?: number } = {};
+  const body: {
+    displayName?: string;
+    partySize?: number;
+    deviceToken?: string;
+  } = {};
   if (opts?.displayName?.trim()) body.displayName = opts.displayName.trim();
   if (opts?.partySize != null) body.partySize = opts.partySize;
+  if (opts?.deviceToken?.trim()) body.deviceToken = opts.deviceToken.trim();
   return api<GuestJoinResult>(
     `/guest/session/${encodeURIComponent(token)}/join`,
     {

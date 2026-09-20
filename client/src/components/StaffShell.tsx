@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { ConnectionStrip } from '@/components/ConnectionStrip';
 import { NotificationInbox } from '@/components/NotificationInbox';
+import { PushOptInBanner } from '@/components/PushOptInBanner';
 import { IconLogout, IconMore, NavIcon } from '@/components/NavIcons';
 import { useAuth } from '@/lib/auth';
 import { STAFF_NAV, type NavItem } from '@/lib/rbac';
@@ -102,7 +103,12 @@ export function StaffShell({
       .catch(() => undefined);
 
     const s = connectSocket(token);
-    const joinRooms = () => joinStaffRooms(s, user);
+    const joinRooms = () =>
+      joinStaffRooms(s, {
+        id: user.id,
+        role: user.role,
+        permissions: user.permissions,
+      });
     joinRooms();
 
     const onNotification = (n: {
@@ -115,6 +121,26 @@ export function StaffShell({
       announceNotification(n, soundOn);
       if (n.id) {
         void markNotificationDelivered(n.id).catch(() => undefined);
+      }
+      notifyStaffDataChanged();
+    };
+    const onKitchenTicket = (payload?: {
+      orderNumber?: number | string;
+      session?: { table?: { number?: number | string } };
+    }) => {
+      const isKitchen =
+        user.role === 'KITCHEN' || user.permissions.includes('orders.kitchen');
+      if (isKitchen) {
+        const table = payload?.session?.table?.number;
+        const num = payload?.orderNumber;
+        announceEvent({
+          enabled: soundOn,
+          kind: 'order.kitchen',
+          text:
+            table != null && num != null
+              ? `New kitchen ticket, order ${num}, table ${table}.`
+              : 'New kitchen ticket. Please start preparation.',
+        });
       }
       notifyStaffDataChanged();
     };
@@ -159,6 +185,7 @@ export function StaffShell({
     s.on('connect', onConnect);
     s.on('notification', onNotification);
     s.on('order.placed', onPlaced);
+    s.on('order.submitted', onKitchenTicket);
     s.on('waiter.call', onWaiterCall);
     s.on('session.updated', notifyStaffDataChanged);
     s.on('session.opened', notifyStaffDataChanged);
@@ -166,13 +193,13 @@ export function StaffShell({
     s.on('session.moved', notifyStaffDataChanged);
     s.on('table.status', notifyStaffDataChanged);
     s.on('payment.settled', notifyStaffDataChanged);
-    s.on('order.submitted', notifyStaffDataChanged);
     s.on('order_item.updated', notifyStaffDataChanged);
     s.on('order.status', notifyStaffDataChanged);
     return () => {
       s.off('connect', onConnect);
       s.off('notification', onNotification);
       s.off('order.placed', onPlaced);
+      s.off('order.submitted', onKitchenTicket);
       s.off('waiter.call', onWaiterCall);
       s.off('session.updated', notifyStaffDataChanged);
       s.off('session.opened', notifyStaffDataChanged);
@@ -180,7 +207,6 @@ export function StaffShell({
       s.off('session.moved', notifyStaffDataChanged);
       s.off('table.status', notifyStaffDataChanged);
       s.off('payment.settled', notifyStaffDataChanged);
-      s.off('order.submitted', notifyStaffDataChanged);
       s.off('order_item.updated', notifyStaffDataChanged);
       s.off('order.status', notifyStaffDataChanged);
     };
@@ -351,6 +377,12 @@ export function StaffShell({
         </div>
 
         <main className="app-scroll app-pad-for-tabbar p-3 sm:px-4 sm:pt-4 md:flex-none md:overflow-visible md:p-6">
+          {user ? (
+            <PushOptInBanner
+              audience={{ kind: 'staff' }}
+              className="mb-3"
+            />
+          ) : null}
           {children}
         </main>
 

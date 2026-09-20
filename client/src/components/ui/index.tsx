@@ -52,9 +52,15 @@ export function Button({
   children,
   variant = 'primary',
   className = '',
+  busy = false,
+  busyLabel,
+  disabled,
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'primary' | 'ghost' | 'danger' | 'outline';
+  /** Shows spinner + busyLabel and disables the button while true. */
+  busy?: boolean;
+  busyLabel?: string;
 }) {
   const styles =
     variant === 'primary'
@@ -67,10 +73,19 @@ export function Button({
   return (
     <button
       type="button"
-      className={`inline-flex min-h-touch min-w-touch items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50 ${styles} ${className}`}
+      disabled={Boolean(disabled || busy)}
+      aria-busy={busy || undefined}
+      className={`inline-flex min-h-touch min-w-touch items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50 ${styles} ${className}`}
       {...props}
     >
-      {children}
+      {busy ? (
+        <>
+          <span className="loader loader-sm shrink-0" aria-hidden />
+          <span>{busyLabel ?? 'Working…'}</span>
+        </>
+      ) : (
+        children
+      )}
     </button>
   );
 }

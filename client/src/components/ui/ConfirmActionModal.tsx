@@ -85,9 +85,11 @@ export function ConfirmActionModal({
             variant={danger ? 'danger' : 'primary'}
             className="flex-1"
             disabled={!canSubmit}
+            busy={busy}
+            busyLabel="Working…"
             onClick={() => onConfirm(trimmed)}
           >
-            {busy ? '…' : confirmLabel}
+            {confirmLabel}
           </Button>
         </div>
       </div>
