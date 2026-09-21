@@ -1,4 +1,5 @@
 import { api } from '@/lib/api';
+import { staffMutate } from '@/lib/staffMutate';
 
 export type TableStatus = 'FREE' | 'OCCUPIED' | 'RESERVED' | 'NEEDS_CLEANING';
 
@@ -27,6 +28,7 @@ export type FloorSession = {
   reservationAt: string | null;
   reservationPartySize: number | null;
   settlement: FloorSettlement | null;
+  pendingSync?: boolean;
 };
 
 export type FloorTable = {
@@ -38,6 +40,7 @@ export type FloorTable = {
   sortOrder: number;
   posX: number | null;
   posY: number | null;
+  pendingSync?: boolean;
   /** Waiter who last closed this table (for Needs cleaning ownership). */
   clearingWaiter?: { id: string; fullName: string } | null;
   activeSession: FloorSession | null;
@@ -72,41 +75,65 @@ export function fetchFloorPlan() {
 }
 
 export function openSession(body: OpenSessionInput) {
-  return api('/sessions', { method: 'POST', body });
+  return staffMutate('/sessions', {
+    method: 'POST',
+    body,
+    scope: 'SESSION',
+    label: 'Open table',
+    optimisticResult: {
+      id: `pending-session-${body.tableId}`,
+      tableId: body.tableId,
+      status: 'OPEN',
+      pendingSync: true,
+      openedAt: new Date().toISOString(),
+    },
+  });
 }
 
 export function moveSession(sessionId: string, toTableId: string) {
-  return api(`/sessions/${sessionId}/move`, {
+  return staffMutate(`/sessions/${sessionId}/move`, {
     method: 'POST',
     body: { toTableId },
+    scope: 'SESSION',
+    label: 'Move table',
   });
 }
 
 export function addGuest(sessionId: string, displayName?: string) {
-  return api(`/sessions/${sessionId}/guests`, {
+  return staffMutate(`/sessions/${sessionId}/guests`, {
     method: 'POST',
     body: { displayName },
+    scope: 'SESSION',
+    label: 'Add guest',
   });
 }
 
 export function markCleaningComplete(tableId: string) {
-  return api('/sessions/cleaning-complete', {
+  return staffMutate('/sessions/cleaning-complete', {
     method: 'POST',
     body: { tableId },
+    scope: 'SESSION',
+    label: 'Cleaning complete',
+    optimisticResult: { ok: true, pendingSync: true, tableId },
   });
 }
 
 export function closeSession(sessionId: string) {
-  return api(`/sessions/${sessionId}/close`, {
+  return staffMutate(`/sessions/${sessionId}/close`, {
     method: 'POST',
     body: {},
+    scope: 'SESSION',
+    label: 'Close session',
   });
 }
 
 export function updateTableStatus(tableId: string, body: UpdateTableStatusInput) {
-  return api(`/tables/${tableId}/status`, {
+  return staffMutate(`/tables/${tableId}/status`, {
     method: 'PATCH',
     body,
+    scope: 'SESSION',
+    label: 'Update table status',
+    optimisticResult: { id: tableId, ...body, pendingSync: true },
   });
 }
 
@@ -115,11 +142,14 @@ export function updateTablePosition(
   posX: number,
   posY: number,
 ) {
-  return api<{ id: string; posX: number; posY: number }>(
+  return staffMutate<{ id: string; posX: number; posY: number }>(
     `/tables/${tableId}/position`,
     {
       method: 'PATCH',
       body: { posX, posY },
+      scope: 'SESSION',
+      label: 'Move table tile',
+      optimisticResult: { id: tableId, posX, posY },
     },
   );
 }

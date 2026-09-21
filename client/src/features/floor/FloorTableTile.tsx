@@ -122,6 +122,11 @@ export function FloorTableTile({
           <p className="font-display text-lg font-extrabold leading-none tracking-tight text-[#2A1C12] sm:text-xl">
             {tableLabel(table)}
           </p>
+          {table.pendingSync || table.activeSession?.pendingSync ? (
+            <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-warn">
+              Pending sync
+            </p>
+          ) : null}
           <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-[#5C4330]/90">
             {table.status === 'NEEDS_CLEANING'
               ? 'Clean'

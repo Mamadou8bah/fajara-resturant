@@ -14,11 +14,14 @@ export class IdempotencyService {
     const existing = await this.prisma.idempotencyKey.findUnique({
       where: { scope_key: { scope, key } },
     });
-    if (existing?.responseJson) {
+    if (existing?.responseJson != null) {
       return { replay: true as const, response: existing.responseJson };
     }
     if (existing) {
-      return { replay: true as const, response: existing.responseJson ?? null };
+      // Incomplete prior attempt (crash / failed handler) — allow retry.
+      await this.prisma.idempotencyKey.delete({
+        where: { scope_key: { scope, key } },
+      });
     }
 
     try {
@@ -33,12 +36,21 @@ export class IdempotencyService {
         const again = await this.prisma.idempotencyKey.findUnique({
           where: { scope_key: { scope, key } },
         });
-        return { replay: true as const, response: again?.responseJson ?? null };
+        if (again?.responseJson != null) {
+          return { replay: true as const, response: again.responseJson };
+        }
+        return { replay: false as const };
       }
       throw err;
     }
 
     return { replay: false as const };
+  }
+
+  async abandon(scope: IdempotencyScope, key: string) {
+    await this.prisma.idempotencyKey.deleteMany({
+      where: { scope, key, responseJson: { equals: Prisma.DbNull } },
+    });
   }
 
   async complete(

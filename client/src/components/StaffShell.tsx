@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { ConnectionStrip } from '@/components/ConnectionStrip';
+import { SyncConflictPanel } from '@/components/SyncConflictPanel';
 import { NotificationInbox } from '@/components/NotificationInbox';
 import { PushOptInBanner } from '@/components/PushOptInBanner';
 import { IconLogout, IconMore, NavIcon } from '@/components/NavIcons';
@@ -313,7 +314,8 @@ export function StaffShell({
         <div className="app-chrome sticky top-0 z-30 shrink-0 bg-cream md:static">
           <div className="safe-pt">
             <OfflineBanner />
-            {showLiveStrip ? <ConnectionStrip /> : null}
+            <SyncConflictPanel />
+            <ConnectionStrip />
           </div>
           <header className="border-b border-[#E0D5C4] px-4 py-2.5 md:px-6 md:py-4">
             {/* Mobile */}

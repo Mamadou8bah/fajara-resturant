@@ -124,6 +124,9 @@ enum PayrollStatus {
 enum IdempotencyScope {
   ORDER
   PAYMENT
+  SESSION
+  KITCHEN
+  MUTATION
 }
 
 model Employee {

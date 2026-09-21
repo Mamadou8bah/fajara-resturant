@@ -1,4 +1,5 @@
 import { api } from '@/lib/api';
+import { staffMutate } from '@/lib/staffMutate';
 
 export type Category = {
   id: string;
@@ -137,17 +138,20 @@ export function listCategories(includeArchived = false) {
 }
 
 export function createCategory(body: CreateCategoryBody) {
-  return api<Category>('/menu/categories', { body });
+  return staffMutate<Category>('/menu/categories', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function updateCategory(id: string, body: UpdateCategoryBody) {
-  return api<Category>(`/menu/categories/${id}`, { method: 'PATCH', body });
+  return staffMutate<Category>(`/menu/categories/${id}`, { method: 'PATCH', body, scope: 'MUTATION',
+  });
 }
 
 export function archiveCategory(id: string) {
-  return api<Category>(`/menu/categories/${id}/archive`, {
+  return staffMutate<Category>(`/menu/categories/${id}/archive`, {
     method: 'POST',
     body: {},
+    scope: 'MUTATION',
   });
 }
 
@@ -163,17 +167,20 @@ export function listItems(opts?: {
 }
 
 export function createItem(body: CreateMenuItemBody) {
-  return api<MenuItem>('/menu/items', { body });
+  return staffMutate<MenuItem>('/menu/items', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function updateItem(id: string, body: UpdateMenuItemBody) {
-  return api<MenuItem>(`/menu/items/${id}`, { method: 'PATCH', body });
+  return staffMutate<MenuItem>(`/menu/items/${id}`, { method: 'PATCH', body, scope: 'MUTATION',
+  });
 }
 
 export function archiveItem(id: string) {
-  return api<MenuItem>(`/menu/items/${id}/archive`, {
+  return staffMutate<MenuItem>(`/menu/items/${id}/archive`, {
     method: 'POST',
     body: {},
+    scope: 'MUTATION',
   });
 }
 
@@ -183,17 +190,20 @@ export function listSpecials(activeOnly = false) {
 }
 
 export function createSpecial(body: CreateSpecialBody) {
-  return api<Special>('/menu/specials', { body });
+  return staffMutate<Special>('/menu/specials', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function updateSpecial(id: string, body: UpdateSpecialBody) {
-  return api<Special>(`/menu/specials/${id}`, { method: 'PATCH', body });
+  return staffMutate<Special>(`/menu/specials/${id}`, { method: 'PATCH', body, scope: 'MUTATION',
+  });
 }
 
 export function deactivateSpecial(id: string) {
-  return api<Special>(`/menu/specials/${id}/deactivate`, {
+  return staffMutate<Special>(`/menu/specials/${id}/deactivate`, {
     method: 'POST',
     body: {},
+    scope: 'MUTATION',
   });
 }
 
@@ -211,7 +221,8 @@ export function createModifierGroup(body: {
   isRequired?: boolean;
   isActive?: boolean;
 }) {
-  return api<MenuModifierGroup>('/menu/modifier-groups', { body });
+  return staffMutate<MenuModifierGroup>('/menu/modifier-groups', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function updateModifierGroup(
@@ -224,16 +235,18 @@ export function updateModifierGroup(
     isActive?: boolean;
   },
 ) {
-  return api<MenuModifierGroup>(`/menu/modifier-groups/${id}`, {
+  return staffMutate<MenuModifierGroup>(`/menu/modifier-groups/${id}`, {
     method: 'PATCH',
     body,
+    scope: 'MUTATION',
   });
 }
 
 export function archiveModifierGroup(id: string) {
-  return api(`/menu/modifier-groups/${id}/archive`, {
+  return staffMutate(`/menu/modifier-groups/${id}/archive`, {
     method: 'POST',
     body: {},
+    scope: 'MUTATION',
   });
 }
 
@@ -248,8 +261,8 @@ export function createModifierOption(
     isActive?: boolean;
   },
 ) {
-  return api<MenuModifierOption>(`/menu/modifier-groups/${groupId}/options`, {
-    body,
+  return staffMutate<MenuModifierOption>(`/menu/modifier-groups/${groupId}/options`, { method: 'POST', body,
+    scope: 'MUTATION',
   });
 }
 
@@ -264,16 +277,18 @@ export function updateModifierOption(
     isActive?: boolean;
   },
 ) {
-  return api<MenuModifierOption>(`/menu/modifier-options/${id}`, {
+  return staffMutate<MenuModifierOption>(`/menu/modifier-options/${id}`, {
     method: 'PATCH',
     body,
+    scope: 'MUTATION',
   });
 }
 
 export function archiveModifierOption(id: string) {
-  return api(`/menu/modifier-options/${id}/archive`, {
+  return staffMutate(`/menu/modifier-options/${id}/archive`, {
     method: 'POST',
     body: {},
+    scope: 'MUTATION',
   });
 }
 
@@ -314,7 +329,8 @@ export function createPromotion(body: {
   isActive?: boolean;
   priority?: number;
 }) {
-  return api<Promotion>('/menu/promotions', { body });
+  return staffMutate<Promotion>('/menu/promotions', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function updatePromotion(
@@ -330,12 +346,14 @@ export function updatePromotion(
     priority: number;
   }>,
 ) {
-  return api<Promotion>(`/menu/promotions/${id}`, { method: 'PATCH', body });
+  return staffMutate<Promotion>(`/menu/promotions/${id}`, { method: 'PATCH', body, scope: 'MUTATION',
+  });
 }
 
 export function deactivatePromotion(id: string) {
-  return api<Promotion>(`/menu/promotions/${id}/deactivate`, {
+  return staffMutate<Promotion>(`/menu/promotions/${id}/deactivate`, {
     method: 'POST',
     body: {},
+    scope: 'MUTATION',
   });
 }

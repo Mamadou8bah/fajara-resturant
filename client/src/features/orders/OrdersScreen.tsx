@@ -13,8 +13,9 @@ import {
 import { ConfirmActionModal } from '@/components/ui/ConfirmActionModal';
 import { useAuth } from '@/lib/auth';
 import { formatGmd } from '@/lib/money';
-import { useOnline } from '@/lib/useOnline';
 import { useStaffRealtimeRefresh } from '@/lib/useStaffRealtimeRefresh';
+import { isQueuedResult } from '@/lib/staffMutate';
+import { PendingSyncBadge } from '@/components/PendingSyncBadge';
 import { addGuest, closeSession } from '@/features/floor/api';
 import {
   assignSessionWaiter,
@@ -74,7 +75,6 @@ const OPEN_ORDER_STATUSES = [
 
 export function OrdersScreen() {
   const { user } = useAuth();
-  const online = useOnline();
   const { can } = useCan();
   const [sessions, setSessions] = useState<WaiterTableSession[]>([]);
   const [menu, setMenu] = useState<MenuItem[]>([]);
@@ -437,10 +437,6 @@ export function OrdersScreen() {
 
   async function onSubmit() {
     if (!selected || cart.length === 0) return;
-    if (!online) {
-      setError('You are offline — connect to send orders to the kitchen.');
-      return;
-    }
     if (!submitRequestIdRef.current) {
       submitRequestIdRef.current = newClientRequestId();
     }
@@ -450,7 +446,7 @@ export function OrdersScreen() {
     setError(null);
     setFlash(null);
     try {
-      await submitOrder({
+      const result = await submitOrder({
         sessionId: selected.id,
         clientRequestId,
         items: cart.map((line) => ({
@@ -470,8 +466,18 @@ export function OrdersScreen() {
       setNotes('');
       setCartOpen(false);
       setAddItemsOpen(false);
-      setFlash('Order held — send items to kitchen when ready');
-      await load();
+      const queued =
+        isQueuedResult(result) ||
+        (!!result &&
+          typeof result === 'object' &&
+          'pendingSync' in result &&
+          Boolean((result as { pendingSync?: boolean }).pendingSync));
+      setFlash(
+        queued
+          ? 'Order queued offline — will sync when you reconnect'
+          : 'Order held — send items to kitchen when ready',
+      );
+      if (!queued) await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Submit failed');
     } finally {
@@ -506,10 +512,12 @@ export function OrdersScreen() {
           ? await requestVoidOrderItem(itemId, reason)
           : await requestCompOrderItem(itemId, reason);
       setFlash(
-        res.message ||
-          (kind === 'void'
-            ? 'Void request sent to manager'
-            : 'Comp request sent to manager'),
+        isQueuedResult(res)
+          ? 'Request queued offline — will sync when you reconnect'
+          : res.message ||
+              (kind === 'void'
+                ? 'Void request sent to manager'
+                : 'Comp request sent to manager'),
       );
       setExceptionConfirm(null);
       await load();
@@ -546,23 +554,27 @@ export function OrdersScreen() {
   }
 
   async function onSendPlaced(orderId: string, itemIds?: string[]) {
-    if (!online) {
-      setError('You are offline — connect to send orders to the kitchen.');
-      return;
-    }
     setSendingOrderId(orderId);
     setError(null);
     try {
-      await sendOrderToKitchen(orderId, itemIds);
+      const result = await sendOrderToKitchen(orderId, itemIds);
       setSendSelection((prev) => {
         const next = { ...prev };
         delete next[orderId];
         return next;
       });
+      const queued =
+        !!result &&
+        typeof result === 'object' &&
+        (('queued' in result && (result as { queued?: boolean }).queued) ||
+          ('pendingSync' in result &&
+            (result as { pendingSync?: boolean }).pendingSync));
       setFlash(
-        itemIds && itemIds.length > 0
-          ? 'Selected items sent'
-          : 'All held items sent',
+        queued
+          ? 'Send queued offline — will sync when you reconnect'
+          : itemIds && itemIds.length > 0
+            ? 'Selected items sent'
+            : 'All held items sent',
       );
       await load();
     } catch (e) {
@@ -696,7 +708,10 @@ export function OrdersScreen() {
   const OrderBuilder = selected ? (
     <Panel className="!mt-0">
       <div className="mb-3">
-        <p className="font-display text-lg font-bold">{tableName(selected)}</p>
+        <p className="font-display text-lg font-bold">
+          {tableName(selected)}{' '}
+          <PendingSyncBadge show={Boolean(selected.pendingSync)} />
+        </p>
         <p className="text-sm text-muted">
           {selected.waiter ? selected.waiter.fullName : 'Unassigned'} ·{' '}
           {selected.guests.length} guest
@@ -1296,10 +1311,11 @@ export function OrdersScreen() {
                             >
                               <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
                                 <p className="font-semibold">
-                                  #{o.orderNumber}
+                                  #{o.orderNumber || '—'}
                                   <span className="ml-2 text-xs font-medium uppercase tracking-wide text-muted">
                                     {o.status}
-                                  </span>
+                                  </span>{' '}
+                                  <PendingSyncBadge show={Boolean(o.pendingSync)} />
                                 </p>
                                 {o.items.some((i) => i.status === 'placed') ? (
                                   <Button

@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { CommonServicesModule } from './common/common-services.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
+import { ClientRequestIdInterceptor } from './common/idempotency/client-request-id.interceptor';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { EmployeesModule } from './employees/employees.module';
 import { GuestModule } from './guest/guest.module';
@@ -83,6 +84,7 @@ import { UploadsModule } from './uploads/uploads.module';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    { provide: APP_INTERCEPTOR, useClass: ClientRequestIdInterceptor },
   ],
 })
 export class AppModule {}

@@ -17,6 +17,7 @@ import { BrandLogo, mediaUrl } from '@/lib/brand';
 import { useCriticalForm } from '@/lib/criticalFormGate';
 import { formatDisplayDateTime, formatGmd, todayIso } from '@/lib/money';
 import { useStaffRealtimeRefresh } from '@/lib/useStaffRealtimeRefresh';
+import { isQueuedResult } from '@/lib/staffMutate';
 import { reopenPaidOrder } from '@/features/orders/api';
 import {
   closeTill,
@@ -543,9 +544,30 @@ export function CheckoutScreen() {
           approverPin: approval.approverPin,
         });
       });
-      const r = await fetchReceipt(txn.id);
+      const pending =
+        isQueuedResult(txn) ||
+        !('id' in txn) ||
+        !txn.id ||
+        String(txn.id).startsWith('pending-') ||
+        ('pendingSync' in txn && Boolean(txn.pendingSync)) ||
+        ('status' in txn && txn.status === 'pending_sync');
+      if (pending) {
+        setTenders([]);
+        setCashReceived('');
+        setDiscountPct(0);
+        setTipPct(null);
+        setTipCustom('');
+        setReceipt(null);
+        setError(
+          'Payment queued offline — it will settle when you reconnect. Check Sync if it fails.',
+        );
+        await loadFloor();
+        return;
+      }
+      const settled = txn as Transaction;
+      const r = await fetchReceipt(settled.id);
       setReceipt(r);
-      setLastTxnId(txn.id);
+      setLastTxnId(settled.id);
       setTenders([]);
       setCashReceived('');
       setDiscountPct(0);
@@ -565,11 +587,14 @@ export function CheckoutScreen() {
     setBusy(true);
     setError(null);
     try {
-      setTill(
-        await openTill({
-          openingBalance: Number(openingBalance) || 0,
-        }),
-      );
+      const session = await openTill({
+        openingBalance: Number(openingBalance) || 0,
+      });
+      if (isQueuedResult(session)) {
+        setError('Till open queued offline — will sync when you reconnect');
+        return;
+      }
+      setTill(session);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Open till failed');
     } finally {
@@ -599,14 +624,19 @@ export function CheckoutScreen() {
         approverEmployeeId = approval.approverEmployeeId;
         approverPin = approval.approverPin;
       }
-      setTill(
-        await closeTill({
+      const closed = await closeTill({
           actualCash: Number(actualCash),
           notes: tillNotes || undefined,
           approverEmployeeId,
           approverPin,
-        }),
-      );
+        });
+      if (isQueuedResult(closed)) {
+        setError('Till close queued offline — will sync when you reconnect');
+        setActualCash('');
+        setTillNotes('');
+        return;
+      }
+      setTill(closed);
       setActualCash('');
       setTillNotes('');
       await loadTill();
@@ -737,7 +767,12 @@ export function CheckoutScreen() {
         id = hit?.id ?? null;
       }
       if (!id) throw new Error('Transaction id not found for reprint');
-      setReceipt(await reprintReceipt(id));
+      const reprinted = await reprintReceipt(id);
+      if (isQueuedResult(reprinted)) {
+        setError('Reprint queued offline — will sync when you reconnect');
+        return;
+      }
+      setReceipt(reprinted);
       setLastTxnId(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Reprint failed');

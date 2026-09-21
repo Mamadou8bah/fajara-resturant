@@ -203,7 +203,9 @@ export function MenuScreen() {
         await load();
       } else {
         const created = await createItem(body);
-        setEditingItem(created.id);
+        if ('id' in created && created.id) {
+          setEditingItem(created.id);
+        }
         setAllergenDraft('');
         // Keep the form open so staff can add Benachin-style customizations next.
         setMobileFormOpen(true);

@@ -1,4 +1,5 @@
 import { api, apiBlob } from '@/lib/api';
+import { staffMutate } from '@/lib/staffMutate';
 import type { Role } from '@/lib/rbac/permissions';
 
 export type Employee = {
@@ -166,34 +167,39 @@ export function fetchEmployees(params: {
 }
 
 export function createEmployee(body: CreateEmployeeInput) {
-  return api<Employee>('/employees', { method: 'POST', body });
+  return staffMutate<Employee>('/employees', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function updateEmployee(
   id: string,
   body: Partial<CreateEmployeeInput>,
 ) {
-  return api<Employee>(`/employees/${id}`, { method: 'PATCH', body });
+  return staffMutate<Employee>(`/employees/${id}`, { method: 'PATCH', body, scope: 'MUTATION',
+  });
 }
 
 export function deactivateEmployee(id: string) {
-  return api<Employee>(`/employees/${id}/deactivate`, {
+  return staffMutate<Employee>(`/employees/${id}/deactivate`, {
     method: 'POST',
     body: {},
+    scope: 'MUTATION',
   });
 }
 
 export function archiveEmployee(id: string) {
-  return api<Employee>(`/employees/${id}/archive`, {
+  return staffMutate<Employee>(`/employees/${id}/archive`, {
     method: 'POST',
     body: {},
+    scope: 'MUTATION',
   });
 }
 
 export function reactivateEmployee(id: string) {
-  return api<Employee>(`/employees/${id}/reactivate`, {
+  return staffMutate<Employee>(`/employees/${id}/reactivate`, {
     method: 'POST',
     body: {},
+    scope: 'MUTATION',
   });
 }
 
@@ -221,18 +227,21 @@ export function assignShift(body: {
   endTime: string;
   notes?: string;
 }) {
-  return api('/shifts/assign', { method: 'POST', body });
+  return staffMutate('/shifts/assign', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function copyLastWeek(targetWeekStart: string) {
-  return api('/shifts/copy-last-week', {
+  return staffMutate('/shifts/copy-last-week', {
     method: 'POST',
     body: { targetWeekStart },
+    scope: 'MUTATION',
   });
 }
 
 export function removeShift(id: string) {
-  return api(`/shifts/${id}`, { method: 'DELETE' });
+  return staffMutate(`/shifts/${id}`, { method: 'DELETE', scope: 'MUTATION',
+  });
 }
 
 export function fetchPayroll(params: {
@@ -261,16 +270,18 @@ export function createPayroll(body: {
   amountDue: number;
   notes?: string;
 }) {
-  return api<PayrollRecord>('/payroll', { method: 'POST', body });
+  return staffMutate<PayrollRecord>('/payroll', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function markPayrollPaid(
   id: string,
   body: { method: string; paidAt?: string; notes?: string },
 ) {
-  return api<PayrollRecord>(`/payroll/${id}/mark-paid`, {
+  return staffMutate<PayrollRecord>(`/payroll/${id}/mark-paid`, {
     method: 'POST',
     body,
+    scope: 'MUTATION',
   });
 }
 
@@ -340,17 +351,20 @@ export function createShiftTemplate(body: {
   name: string;
   payload: ShiftTemplate['payload'];
 }) {
-  return api<ShiftTemplate>('/shifts/templates', { method: 'POST', body });
+  return staffMutate<ShiftTemplate>('/shifts/templates', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function deleteShiftTemplate(id: string) {
-  return api(`/shifts/templates/${id}`, { method: 'DELETE' });
+  return staffMutate(`/shifts/templates/${id}`, { method: 'DELETE', scope: 'MUTATION',
+  });
 }
 
 export function applyShiftTemplate(templateId: string, targetWeekStart: string) {
-  return api('/shifts/templates/apply', {
+  return staffMutate('/shifts/templates/apply', {
     method: 'POST',
     body: { templateId, targetWeekStart },
+    scope: 'MUTATION',
   });
 }
 
@@ -365,7 +379,8 @@ export function createShiftType(body: {
   endTime: string;
   color?: string;
 }) {
-  return api<ShiftType>('/shifts/types', { method: 'POST', body });
+  return staffMutate<ShiftType>('/shifts/types', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function updateShiftType(
@@ -378,7 +393,8 @@ export function updateShiftType(
     isActive: boolean;
   }>,
 ) {
-  return api<ShiftType>(`/shifts/types/${id}`, { method: 'PATCH', body });
+  return staffMutate<ShiftType>(`/shifts/types/${id}`, { method: 'PATCH', body, scope: 'MUTATION',
+  });
 }
 
 export function addDaysIso(iso: string, days: number): string {

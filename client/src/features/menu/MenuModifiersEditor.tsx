@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui';
+import { isQueuedResult } from '@/lib/staffMutate';
 import { listStock, type InventoryItem } from '@/features/inventory/api';
 import {
   archiveModifierGroup,
@@ -143,6 +144,11 @@ export function MenuModifiersEditor({
         isRequired: tpl.group.isRequired,
         isActive: true,
       });
+      if (isQueuedResult(group) || !('id' in group) || !group.id) {
+        onError('Modifier group queued offline — reconnect to finish template');
+        await onChanged();
+        return;
+      }
       for (const opt of tpl.options) {
         await createModifierOption(group.id, {
           name: opt.name,

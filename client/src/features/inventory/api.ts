@@ -1,4 +1,5 @@
 import { api } from '@/lib/api';
+import { staffMutate } from '@/lib/staffMutate';
 
 export type InventoryItemType =
   | 'RAW'
@@ -177,45 +178,54 @@ export function listStock(params?: {
 }
 
 export function createInventoryItem(body: CreateInventoryItemBody) {
-  return api<InventoryItem>('/inventory/items', { body });
+  return staffMutate<InventoryItem>('/inventory/items', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function updateInventoryItem(id: string, body: UpdateInventoryItemBody) {
-  return api<InventoryItem>(`/inventory/items/${id}`, {
+  return staffMutate<InventoryItem>(`/inventory/items/${id}`, {
     method: 'PATCH',
     body,
+    scope: 'MUTATION',
   });
 }
 
 export function archiveInventoryItem(id: string) {
-  return api<InventoryItem>(`/inventory/items/${id}/archive`, {
+  return staffMutate<InventoryItem>(`/inventory/items/${id}/archive`, {
     method: 'POST',
     body: {},
+    scope: 'MUTATION',
   });
 }
 
 export function receiveStock(body: ReceiveStockBody) {
-  return api('/inventory/receive', { body });
+  return staffMutate('/inventory/receive', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function postCount(body: PostCountBody) {
-  return api('/inventory/count', { body });
+  return staffMutate('/inventory/count', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function postWaste(body: StockMovementBody) {
-  return api('/inventory/waste', { body });
+  return staffMutate('/inventory/waste', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function postStaffMeal(body: StockMovementBody) {
-  return api('/inventory/staff-meal', { body });
+  return staffMutate('/inventory/staff-meal', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function postSpoilage(body: StockMovementBody) {
-  return api('/inventory/spoilage', { body });
+  return staffMutate('/inventory/spoilage', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function postStockReturn(body: StockMovementBody) {
-  return api('/inventory/return', { body });
+  return staffMutate('/inventory/return', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function listMovements(params?: {
@@ -241,15 +251,18 @@ export function listRecipes(kind?: string) {
 }
 
 export function createRecipe(body: CreateRecipeBody) {
-  return api<Recipe>('/recipes', { body });
+  return staffMutate<Recipe>('/recipes', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function updateRecipe(id: string, body: UpdateRecipeBody) {
-  return api<Recipe>(`/recipes/${id}`, { method: 'PATCH', body });
+  return staffMutate<Recipe>(`/recipes/${id}`, { method: 'PATCH', body, scope: 'MUTATION',
+  });
 }
 
 export function deleteRecipe(id: string) {
-  return api(`/recipes/${id}`, { method: 'DELETE' });
+  return staffMutate(`/recipes/${id}`, { method: 'DELETE', scope: 'MUTATION',
+  });
 }
 
 export function listBatches(params?: {
@@ -268,7 +281,8 @@ export function listBatches(params?: {
 }
 
 export function confirmBatch(body: ConfirmBatchBody) {
-  return api<ProductionBatch>('/production/batches/confirm', { body });
+  return staffMutate<ProductionBatch>('/production/batches/confirm', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function n(v: string | number | null | undefined): number {
@@ -299,7 +313,8 @@ export function createSupplier(body: {
   phone?: string;
   notes?: string;
 }) {
-  return api<Supplier>('/suppliers', { body });
+  return staffMutate<Supplier>('/suppliers', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function updateSupplier(
@@ -312,5 +327,6 @@ export function updateSupplier(
     isActive?: boolean;
   },
 ) {
-  return api<Supplier>(`/suppliers/${id}`, { method: 'PATCH', body });
+  return staffMutate<Supplier>(`/suppliers/${id}`, { method: 'PATCH', body, scope: 'MUTATION',
+  });
 }

@@ -1,4 +1,6 @@
 import { api } from '@/lib/api';
+import { staffMutate } from '@/lib/staffMutate';
+import { newClientRequestId as offlineId } from '@/lib/offlineWriteQueue';
 
 export type PaymentLine = {
   method: string;
@@ -224,11 +226,45 @@ export function fetchBillPreview(sessionId: string, guestId?: string) {
 }
 
 export function settlePayment(body: SettlePaymentBody) {
-  return api<Transaction>('/payments/settle', { body });
+  const clientRequestId = body.clientRequestId || offlineId();
+  return staffMutate<Transaction>('/payments/settle', {
+    method: 'POST',
+    body: { ...body, clientRequestId },
+    scope: 'PAYMENT',
+    label: 'Settle payment',
+    clientRequestId,
+    injectBodyClientRequestId: true,
+    requireConfirmDiscard: true,
+    optimisticResult: {
+      id: `pending-txn-${clientRequestId}`,
+      transactionNumber: 'PENDING',
+      sessionId: body.sessionId,
+      total: 0,
+      subtotal: 0,
+      discountAmount: body.discountAmount ?? 0,
+      tipAmount: body.tipAmount ?? 0,
+      taxAmount: 0,
+      status: 'pending_sync',
+      createdAt: new Date().toISOString(),
+      payments: body.payments.map((p, i) => ({
+        id: `pending-pay-${i}`,
+        method: p.method,
+        amount: p.amount,
+      })),
+      pendingSync: true,
+      clientRequestId,
+    } as Transaction & { pendingSync?: boolean; clientRequestId?: string },
+  });
 }
 
 export function refundPayment(body: RefundBody) {
-  return api('/payments/refund', { body });
+  return staffMutate('/payments/refund', {
+    method: 'POST',
+    body,
+    scope: 'PAYMENT',
+    label: 'Refund',
+    requireConfirmDiscard: true,
+  });
 }
 
 export function fetchReceipt(transactionId: string) {
@@ -236,9 +272,11 @@ export function fetchReceipt(transactionId: string) {
 }
 
 export function reprintReceipt(transactionId: string) {
-  return api<Receipt>(`/payments/${transactionId}/receipt/reprint`, {
+  return staffMutate<Receipt>(`/payments/${transactionId}/receipt/reprint`, {
     method: 'POST',
     body: {},
+    scope: 'PAYMENT',
+    label: 'Reprint receipt',
   });
 }
 
@@ -250,7 +288,12 @@ export function openTill(body: {
   openingBalance: number;
   deviceLabel?: string;
 }) {
-  return api<TillSession>('/till/open', { body });
+  return staffMutate<TillSession>('/till/open', {
+    method: 'POST',
+    body,
+    scope: 'MUTATION',
+    label: 'Open till',
+  });
 }
 
 export function closeTill(body: {
@@ -259,15 +302,31 @@ export function closeTill(body: {
   approverEmployeeId?: string;
   approverPin?: string;
 }) {
-  return api<TillSession>('/till/close', { body });
+  return staffMutate<TillSession>('/till/close', {
+    method: 'POST',
+    body,
+    scope: 'MUTATION',
+    label: 'Close till',
+    requireConfirmDiscard: true,
+  });
 }
 
 export function tillPaidIn(body: { amount: number; reason: string }) {
-  return api('/till/paid-in', { body });
+  return staffMutate('/till/paid-in', {
+    method: 'POST',
+    body,
+    scope: 'MUTATION',
+    label: 'Till paid in',
+  });
 }
 
 export function tillPaidOut(body: { amount: number; reason: string }) {
-  return api('/till/paid-out', { body });
+  return staffMutate('/till/paid-out', {
+    method: 'POST',
+    body,
+    scope: 'MUTATION',
+    label: 'Till paid out',
+  });
 }
 
 export function tillAdjustment(body: {
@@ -276,7 +335,13 @@ export function tillAdjustment(body: {
   approverEmployeeId?: string;
   approverPin?: string;
 }) {
-  return api('/till/adjustment', { body });
+  return staffMutate('/till/adjustment', {
+    method: 'POST',
+    body,
+    scope: 'MUTATION',
+    label: 'Till adjustment',
+    requireConfirmDiscard: true,
+  });
 }
 
 export function fetchSalesHistory(params?: {

@@ -1,4 +1,6 @@
 import { api } from '@/lib/api';
+import { staffMutate } from '@/lib/staffMutate';
+import { newClientRequestId as offlineId } from '@/lib/offlineWriteQueue';
 
 export type WaiterGuest = {
   id: string;
@@ -14,6 +16,7 @@ export type WaiterOrderItem = {
   priceSnapshot: string | number;
   kitchenNotes: string | null;
   settledTransactionId?: string | null;
+  pendingSync?: boolean;
   guest: { id: string; displayName: string | null; sortOrder: number } | null;
   menuItem?: {
     id: string;
@@ -30,6 +33,7 @@ export type WaiterOrder = {
   status: string;
   source: string;
   submittedAt: string;
+  pendingSync?: boolean;
   items: WaiterOrderItem[];
 };
 
@@ -40,6 +44,7 @@ export type WaiterTableSession = {
   waiterId: string | null;
   guestCount?: number;
   reservationPartySize?: number | null;
+  pendingSync?: boolean;
   table: {
     id: string;
     number: number;
@@ -154,23 +159,25 @@ export function optionPriceDelta(o: MenuModifierOption): number {
 }
 
 export function cancelOrderItem(itemId: string, reason?: string) {
-  return api(`/orders/items/${encodeURIComponent(itemId)}/cancel`, {
+  return staffMutate(`/orders/items/${encodeURIComponent(itemId)}/cancel`, {
     method: 'POST',
     body: reason ? { reason } : {},
+    scope: 'ORDER',
+    label: 'Cancel item',
   });
 }
 
 export function requestVoidOrderItem(itemId: string, reason: string) {
-  return api<{ ok: true; message: string }>(
+  return staffMutate<{ ok: true; message: string }>(
     `/orders/items/${encodeURIComponent(itemId)}/void-request`,
-    { method: 'POST', body: { reason } },
+    { method: 'POST', body: { reason }, scope: 'ORDER', label: 'Void request' },
   );
 }
 
 export function requestCompOrderItem(itemId: string, reason: string) {
-  return api<{ ok: true; message: string }>(
+  return staffMutate<{ ok: true; message: string }>(
     `/orders/items/${encodeURIComponent(itemId)}/comp-request`,
-    { method: 'POST', body: { reason } },
+    { method: 'POST', body: { reason }, scope: 'ORDER', label: 'Comp request' },
   );
 }
 
@@ -182,9 +189,11 @@ export function voidOrderItem(
     approverPin: string;
   },
 ) {
-  return api(`/orders/items/${encodeURIComponent(itemId)}/void`, {
+  return staffMutate(`/orders/items/${encodeURIComponent(itemId)}/void`, {
     method: 'POST',
     body,
+    scope: 'ORDER',
+    label: 'Void item',
   });
 }
 
@@ -196,9 +205,11 @@ export function compOrderItem(
     approverPin: string;
   },
 ) {
-  return api(`/orders/items/${encodeURIComponent(itemId)}/comp`, {
+  return staffMutate(`/orders/items/${encodeURIComponent(itemId)}/comp`, {
     method: 'POST',
     body,
+    scope: 'ORDER',
+    label: 'Comp item',
   });
 }
 
@@ -210,16 +221,33 @@ export function reopenPaidOrder(
     approverPin: string;
   },
 ) {
-  return api(`/orders/${encodeURIComponent(orderId)}/reopen`, {
+  return staffMutate(`/orders/${encodeURIComponent(orderId)}/reopen`, {
     method: 'POST',
     body,
+    scope: 'ORDER',
+    label: 'Reopen order',
   });
 }
 
 export function submitOrder(body: SubmitOrderInput) {
-  return api('/orders', {
+  const clientRequestId = body.clientRequestId || offlineId();
+  return staffMutate('/orders', {
     method: 'POST',
-    body: { ...body, source: body.source ?? 'WAITER' },
+    body: { ...body, source: body.source ?? 'WAITER', clientRequestId },
+    scope: 'ORDER',
+    label: 'Place order',
+    clientRequestId,
+    injectBodyClientRequestId: true,
+    optimisticResult: {
+      id: `pending-${clientRequestId}`,
+      orderNumber: 0,
+      status: 'submitted',
+      source: body.source ?? 'WAITER',
+      submittedAt: new Date().toISOString(),
+      pendingSync: true,
+      clientRequestId,
+      items: [],
+    },
   });
 }
 
@@ -227,31 +255,49 @@ export function firstAccept(body: {
   notificationId?: string;
   sessionId?: string;
 }) {
-  return api('/orders/first-accept', { method: 'POST', body });
+  return staffMutate('/orders/first-accept', {
+    method: 'POST',
+    body,
+    scope: 'ORDER',
+    label: 'Accept call',
+  });
 }
 
 export function sendOrderToKitchen(orderId: string, itemIds?: string[]) {
-  return api(`/orders/${orderId}/send-to-kitchen`, {
+  return staffMutate(`/orders/${orderId}/send-to-kitchen`, {
     method: 'POST',
     body: itemIds && itemIds.length > 0 ? { itemIds } : {},
+    scope: 'ORDER',
+    label: 'Send to kitchen',
+    optimisticResult: { ok: true, pendingSync: true },
   });
 }
 
 export function serveOrderItem(itemId: string) {
-  return api(`/orders/items/${itemId}/serve`, { method: 'POST', body: {} });
+  return staffMutate(`/orders/items/${itemId}/serve`, {
+    method: 'POST',
+    body: {},
+    scope: 'ORDER',
+    label: 'Mark served',
+    optimisticResult: { id: itemId, status: 'served', pendingSync: true },
+  });
 }
 
 export function markItemUnavailable(itemId: string, reason?: string) {
-  return api(`/orders/items/${itemId}/unavailable`, {
+  return staffMutate(`/orders/items/${itemId}/unavailable`, {
     method: 'POST',
     body: reason ? { reason } : {},
+    scope: 'ORDER',
+    label: 'Mark unavailable',
   });
 }
 
 export function assignSessionWaiter(sessionId: string, waiterId: string) {
-  return api(`/orders/sessions/${sessionId}/assign-waiter`, {
+  return staffMutate(`/orders/sessions/${sessionId}/assign-waiter`, {
     method: 'POST',
     body: { waiterId },
+    scope: 'SESSION',
+    label: 'Assign waiter',
   });
 }
 
@@ -266,24 +312,38 @@ export function fetchNotifications() {
 }
 
 export function markNotificationDelivered(id: string) {
-  return api(`/notifications/${id}/delivered`, { method: 'PATCH', body: {} });
+  return staffMutate(`/notifications/${id}/delivered`, {
+    method: 'PATCH',
+    body: {},
+    scope: 'MUTATION',
+    label: 'Mark notification delivered',
+  });
 }
 
 export function markNotificationSeen(id: string) {
-  return api(`/notifications/${id}/seen`, { method: 'PATCH', body: {} });
+  return staffMutate(`/notifications/${id}/seen`, {
+    method: 'PATCH',
+    body: {},
+    scope: 'MUTATION',
+    label: 'Mark notification seen',
+  });
 }
 
 export function approveRemake(notificationId: string) {
-  return api('/orders/exceptions/approve', {
+  return staffMutate('/orders/exceptions/approve', {
     method: 'POST',
     body: { notificationId },
+    scope: 'ORDER',
+    label: 'Approve exception',
   });
 }
 
 export function declineRemake(notificationId: string) {
-  return api('/orders/exceptions/decline', {
+  return staffMutate('/orders/exceptions/decline', {
     method: 'POST',
     body: { notificationId },
+    scope: 'ORDER',
+    label: 'Decline exception',
   });
 }
 
@@ -296,8 +356,5 @@ export function declineException(notificationId: string) {
 }
 
 export function newClientRequestId() {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID();
-  }
-  return `req-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return offlineId();
 }

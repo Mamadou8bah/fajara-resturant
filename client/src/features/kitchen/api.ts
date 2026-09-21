@@ -1,4 +1,5 @@
 import { api } from '@/lib/api';
+import { staffMutate } from '@/lib/staffMutate';
 
 export type KitchenItemStatus =
   | 'draft'
@@ -18,6 +19,7 @@ export type KitchenTicketItem = {
   kitchenNotes: string | null;
   isTakeaway: boolean;
   createdAt: string;
+  pendingSync?: boolean;
   modifiers: {
     id: string;
     nameSnapshot: string;
@@ -84,9 +86,16 @@ export function transitionKitchenItem(
   itemId: string,
   status: KitchenItemStatus,
 ) {
-  return api<KitchenTicketItem>(`/kitchen/items/${itemId}/transition`, {
+  return staffMutate<KitchenTicketItem>(`/kitchen/items/${itemId}/transition`, {
     method: 'POST',
     body: { status },
+    scope: 'KITCHEN',
+    label: `Kitchen → ${status}`,
+    optimisticResult: {
+      id: itemId,
+      status,
+      pendingSync: true,
+    } as KitchenTicketItem,
   });
 }
 
@@ -98,19 +107,23 @@ export function remakeKitchenItem(
     approverPin: string;
   },
 ) {
-  return api<KitchenTicketItem>(`/kitchen/items/${itemId}/remake`, {
+  return staffMutate<KitchenTicketItem>(`/kitchen/items/${itemId}/remake`, {
     method: 'POST',
     body,
+    scope: 'KITCHEN',
+    label: 'Remake item',
   });
 }
 
 /** Ask owners/managers to approve a remake (no PIN on the kitchen device). */
 export function requestKitchenRemake(itemId: string, reason: string) {
-  return api<{ ok: true; notified: number; message: string }>(
+  return staffMutate<{ ok: true; notified: number; message: string }>(
     `/kitchen/items/${itemId}/remake-request`,
     {
       method: 'POST',
       body: { reason },
+      scope: 'KITCHEN',
+      label: 'Request remake',
     },
   );
 }

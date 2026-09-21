@@ -1,4 +1,5 @@
 import { api } from '@/lib/api';
+import { staffMutate } from '@/lib/staffMutate';
 
 export type SettingsMap = Record<string, unknown>;
 
@@ -40,9 +41,10 @@ export function fetchSettings() {
 }
 
 export function putSetting(key: string, value: unknown) {
-  return api<SettingRow>(`/settings/${encodeURIComponent(key)}`, {
+  return staffMutate<SettingRow>(`/settings/${encodeURIComponent(key)}`, {
     method: 'PUT',
     body: { value },
+    scope: 'MUTATION',
   });
 }
 
@@ -57,7 +59,8 @@ export function createTable(body: {
   seats: number;
   sortOrder?: number;
 }) {
-  return api<DiningTable>('/tables', { method: 'POST', body });
+  return staffMutate<DiningTable>('/tables', { method: 'POST', body, scope: 'MUTATION',
+  });
 }
 
 export function updateTable(
@@ -69,11 +72,13 @@ export function updateTable(
     sortOrder?: number;
   },
 ) {
-  return api<DiningTable>(`/tables/${id}`, { method: 'PATCH', body });
+  return staffMutate<DiningTable>(`/tables/${id}`, { method: 'PATCH', body, scope: 'MUTATION',
+  });
 }
 
 export function archiveTable(id: string) {
-  return api(`/tables/${id}`, { method: 'DELETE' });
+  return staffMutate(`/tables/${id}`, { method: 'DELETE', scope: 'MUTATION',
+  });
 }
 
 export function exportTableQr(tableId: string) {
@@ -81,7 +86,8 @@ export function exportTableQr(tableId: string) {
 }
 
 export function rotateTableQr(tableId: string) {
-  return api(`/tables/${tableId}/qr/rotate`, { method: 'POST' });
+  return staffMutate(`/tables/${tableId}/qr/rotate`, { method: 'POST', scope: 'MUTATION',
+  });
 }
 
 export function changeOwnPin(body: { currentPin?: string; newPin: string }) {

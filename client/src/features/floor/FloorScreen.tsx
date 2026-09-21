@@ -236,11 +236,44 @@ export function FloorScreen() {
       Math.max(1, guestCount),
       selected.seats,
     );
+    const tableId = selected.id;
+    // Optimistic floor update so offline open feels instant.
+    setTables((prev) =>
+      prev.map((t) =>
+        t.id === tableId
+          ? {
+              ...t,
+              status: 'OCCUPIED' as const,
+              pendingSync: true,
+              activeSession: t.activeSession ?? {
+                id: `pending-session-${tableId}`,
+                status: 'OPEN',
+                openedAt: new Date().toISOString(),
+                guestCount: 1,
+                pendingSync: true,
+                waiter: user
+                  ? { id: user.id, fullName: user.fullName }
+                  : null,
+                guests: [
+                  {
+                    id: `pending-guest-${tableId}`,
+                    displayName: guestName.trim() || null,
+                    sortOrder: 0,
+                  },
+                ],
+                reservationName: null,
+                reservationAt: null,
+                reservationPartySize: party,
+                settlement: null,
+              },
+            }
+          : t,
+      ),
+    );
     await run('open', () =>
       openSession({
-        tableId: selected.id,
+        tableId,
         waiterId: user?.id,
-        // One seated guest (lead); party size is expected headcount so others can QR-join
         guests: [
           {
             displayName: guestName.trim() || undefined,

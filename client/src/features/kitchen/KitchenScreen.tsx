@@ -145,6 +145,11 @@ function TicketCard({
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
+          {group.some((g) => g.pendingSync) ? (
+            <span className="rounded-md bg-warn px-2 py-0.5 text-[10px] font-bold uppercase text-ink">
+              Pending sync
+            </span>
+          ) : null}
           {group.some((g) => g.isAppendedRound) ? (
             <span className="rounded-md bg-warn px-2 py-0.5 text-[10px] font-bold uppercase text-cream">
               Added
@@ -415,6 +420,27 @@ export function KitchenScreen() {
   async function onTransition(item: KitchenTicketItem, next: KitchenItemStatus) {
     setBusyId(item.id);
     setError(null);
+    // Optimistic column move for offline / slow networks.
+    setTickets((prev) => {
+      if (!prev) return prev;
+      const remove = (list: KitchenTicketItem[]) =>
+        list.filter((i) => i.id !== item.id);
+      const moved: KitchenTicketItem = {
+        ...item,
+        status: next,
+        pendingSync: true,
+      };
+      const nextTickets: KitchenTickets = {
+        submitted: remove(prev.submitted),
+        preparing: remove(prev.preparing),
+        ready: remove(prev.ready),
+      };
+      if (next === 'submitted') nextTickets.submitted = [moved, ...nextTickets.submitted];
+      else if (next === 'preparing')
+        nextTickets.preparing = [moved, ...nextTickets.preparing];
+      else if (next === 'ready') nextTickets.ready = [moved, ...nextTickets.ready];
+      return nextTickets;
+    });
     try {
       await transitionKitchenItem(item.id, next);
       if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
@@ -423,6 +449,7 @@ export function KitchenScreen() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Transition failed');
+      await load();
     } finally {
       setBusyId(null);
     }
@@ -486,7 +513,13 @@ export function KitchenScreen() {
     setError(null);
     try {
       const res = await requestKitchenRemake(item.id, reason);
-      window.alert(res.message);
+      window.alert(
+        'queued' in res && res.queued
+          ? 'Remake request queued offline — will sync when you reconnect'
+          : 'message' in res
+            ? res.message
+            : 'Remake request sent',
+      );
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not request remake');
