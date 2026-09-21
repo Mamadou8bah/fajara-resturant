@@ -1,19 +1,39 @@
-/* Offline-first shell + guest browse cache + Web Push. Read-only — no write queue. */
-const SHELL_CACHE = 'fajara-shell-v4';
+/* Offline-first shell + guest browse cache + Web Push. Staff API GETs use app IndexedDB. */
+const SHELL_CACHE = 'fajara-shell-v5';
 const MENU_CACHE = 'fajara-guest-menu-v1';
-const SHELL = ['/', '/app/login'];
+const STATIC_CACHE = 'fajara-static-v1';
+const SHELL = [
+  '/',
+  '/app/login',
+  '/app/floor',
+  '/app/orders',
+  '/app/kitchen',
+  '/app/checkout',
+  '/app/menu',
+  '/app/inventory',
+  '/app/employees',
+  '/app/reports',
+  '/app/settings',
+  '/app/dashboard',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(SHELL_CACHE)
-      .then((cache) => cache.addAll(SHELL))
+      .then((cache) =>
+        Promise.all(
+          SHELL.map((url) =>
+            cache.add(url).catch(() => undefined),
+          ),
+        ),
+      )
       .then(() => self.skipWaiting()),
   );
 });
 
 self.addEventListener('activate', (event) => {
-  const keep = new Set([SHELL_CACHE, MENU_CACHE]);
+  const keep = new Set([SHELL_CACHE, MENU_CACHE, STATIC_CACHE]);
   event.waitUntil(
     caches
       .keys()
@@ -36,6 +56,28 @@ function isGuestPage(url) {
     url.pathname.startsWith('/m/') ||
     url.pathname.startsWith('/t/') ||
     url.pathname.startsWith('/guest')
+  );
+}
+
+function isStaffAppPage(url) {
+  return url.pathname === '/app' || url.pathname.startsWith('/app/');
+}
+
+function isNextStatic(url) {
+  return (
+    url.origin === self.location.origin &&
+    (url.pathname.startsWith('/_next/static/') ||
+      url.pathname.startsWith('/icons/') ||
+      /\.(?:js|css|woff2?|png|svg|ico|webp)$/i.test(url.pathname))
+  );
+}
+
+function isApiRequest(url) {
+  return (
+    url.pathname.startsWith('/api') ||
+    (url.hostname.includes('localhost') && url.port === '4000') ||
+    url.hostname.includes('onrender.com') ||
+    url.hostname.includes('neon.tech')
   );
 }
 
@@ -73,19 +115,40 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Skip other API / localhost API port — network only.
-  if (
-    url.pathname.startsWith('/api') ||
-    (url.hostname.includes('localhost') && url.port === '4000')
-  ) {
+  // Staff/API JSON — app handles IndexedDB read cache; do not SW-cache auth'd APIs.
+  if (isApiRequest(url)) {
     return;
   }
 
-  // Guest pages + app shell: network with cache fallback.
+  // Next static assets + icons: cache-first after first fetch.
+  if (isNextStatic(url)) {
+    event.respondWith(
+      caches.match(req).then((cached) => {
+        const network = fetch(req)
+          .then((res) => {
+            if (res.ok) {
+              const copy = res.clone();
+              caches.open(STATIC_CACHE).then((c) => c.put(req, copy));
+            }
+            return res;
+          })
+          .catch(() => cached);
+        return cached || network;
+      }),
+    );
+    return;
+  }
+
+  // App shell + guest pages: network with cache fallback.
   event.respondWith(
     fetch(req)
       .then((res) => {
-        if (res.ok && (isGuestPage(url) || req.mode === 'navigate')) {
+        if (
+          res.ok &&
+          (isGuestPage(url) ||
+            isStaffAppPage(url) ||
+            req.mode === 'navigate')
+        ) {
           const copy = res.clone();
           caches.open(SHELL_CACHE).then((c) => c.put(req, copy));
         }
@@ -94,7 +157,13 @@ self.addEventListener('fetch', (event) => {
       .catch(() =>
         caches
           .match(req)
-          .then((r) => r || caches.match('/app/login') || caches.match('/')),
+          .then(
+            (r) =>
+              r ||
+              caches.match('/app/floor') ||
+              caches.match('/app/login') ||
+              caches.match('/'),
+          ),
       ),
   );
 });

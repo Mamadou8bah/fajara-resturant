@@ -1,4 +1,8 @@
-/** Persist last intended PWA launch target (guest table vs staff). */
+/**
+ * Optional last-table / staff markers in localStorage.
+ * Site `/` always goes to staff login (or dashboard) — these hints do not
+ * divert the public root. Guests enter only via /t or /m QR links.
+ */
 
 const KEY = 'fajara_pwa_launch';
 
@@ -49,7 +53,7 @@ function writeHint(hint: PwaLaunchHint) {
   }
 }
 
-/** Prefer stable /t/{tableId}; fall back to /m/{token} for staging demos. */
+/** Record last guest table after a successful QR join (not used to divert `/`). */
 export function recordGuestLaunch(opts: {
   tableId?: string | null;
   token?: string | null;

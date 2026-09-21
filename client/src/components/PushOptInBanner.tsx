@@ -27,12 +27,16 @@ export function PushOptInBanner({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isGuest = audience?.kind === 'guest';
+
   useEffect(() => {
     if (!audience) {
       setMode('hidden');
       return;
     }
-    if (shouldShowIosInstallPrompt()) {
+    // Guests: no iOS Add-to-Home-Screen nag. Android (and other in-tab push
+    // browsers) still see Enable when canRequestPushPermission() is true.
+    if (!isGuest && shouldShowIosInstallPrompt()) {
       setMode('install');
       return;
     }
@@ -42,14 +46,26 @@ export function PushOptInBanner({
     }
     setMode('hidden');
     void refreshWebPushIfEnabled(audience);
-  }, [audience]);
+  }, [audience, isGuest]);
 
   if (!audience || mode === 'hidden') return null;
-  if (!pushSupported() && !(isIos() && !isStandalonePwa())) return null;
+  // Guests never need the iOS-only install shell; hide if push unsupported.
+  if (!pushSupported()) {
+    if (isGuest) return null;
+    if (!(isIos() && !isStandalonePwa())) return null;
+  }
+  // Guest on iOS Safari (no Home Screen): cannot enable — don't show banner.
+  if (isGuest && !canRequestPushPermission() && mode !== 'enable') {
+    return null;
+  }
 
   async function onEnable() {
     if (!audience) return;
     if (!canRequestPushPermission()) {
+      if (isGuest) {
+        setMode('hidden');
+        return;
+      }
       setMode('install');
       return;
     }
@@ -82,10 +98,9 @@ export function PushOptInBanner({
         <>
           <p className="text-sm font-bold">Get alerts on this iPhone</p>
           <p className="mt-1 text-sm text-muted">
-            Tap Share, then <span className="font-semibold">Add to Home Screen</span>.
-            Open from that icon (not Safari) to turn on alerts. If an older icon still
-            opens staff login, remove it and add again from your table QR — the Home
-            Screen app opens your latest table.
+            Tap Share, then{' '}
+            <span className="font-semibold">Add to Home Screen</span>. Open from
+            that icon (not Safari) to turn on staff alerts. Works on iOS 16.4+.
           </p>
           <div className="mt-3 flex gap-2">
             <Button
@@ -116,7 +131,9 @@ export function PushOptInBanner({
             {audience.kind === 'guest'
               ? 'Get notified when your order is preparing or ready — even if you leave this screen.'
               : 'Get waiter calls, kitchen tickets, and approvals when the app is closed.'}
-            {isIos() ? ' Works on Home Screen apps (iOS 16.4+).' : ''}
+            {!isGuest && isIos()
+              ? ' Works on Home Screen apps (iOS 16.4+).'
+              : ''}
           </p>
           {error ? (
             <p className="mt-2 text-sm font-medium text-cta">{error}</p>

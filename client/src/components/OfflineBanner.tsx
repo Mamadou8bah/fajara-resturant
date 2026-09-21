@@ -25,8 +25,8 @@ export function OfflineBanner() {
   return (
     <div className="bg-warn px-4 py-2 text-center text-sm font-semibold text-ink">
       {pending > 0
-        ? `You are offline — actions are queued (${pending} pending) and will sync when you reconnect.`
-        : 'You are offline — you can keep working; actions will queue and sync when you reconnect.'}
+        ? `You are offline — showing last saved screens; ${pending} action(s) queued to sync when you reconnect.`
+        : 'You are offline — showing last saved screens. New actions will queue and sync when you reconnect.'}
     </div>
   );
 }

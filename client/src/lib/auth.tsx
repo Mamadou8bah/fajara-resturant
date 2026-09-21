@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { api, getStoredToken, setStoredToken } from '@/lib/api';
+import { api, getStoredToken, isNetworkFailure, setStoredToken } from '@/lib/api';
 import { connectSocket, disconnectSocket } from '@/lib/socket';
 import { recordStaffLaunch } from '@/lib/pwaLaunch';
 import {
@@ -30,6 +30,25 @@ export type StaffUser = {
   permissions: Permission[];
   defaultRoute: string;
 };
+
+const USER_KEY = 'fajara_staff_user';
+
+function loadCachedUser(): StaffUser | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(USER_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as StaffUser;
+  } catch {
+    return null;
+  }
+}
+
+function saveCachedUser(user: StaffUser | null) {
+  if (typeof window === 'undefined') return;
+  if (user) sessionStorage.setItem(USER_KEY, JSON.stringify(user));
+  else sessionStorage.removeItem(USER_KEY);
+}
 
 type AuthState = {
   user: StaffUser | null;
@@ -89,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         sessionId: payload.sessionId,
       });
       setUser(u);
+      saveCachedUser(u);
       recordStaffLaunch();
       connectSocket(accessToken);
       return u;
@@ -98,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearSession = useCallback(() => {
     setStoredToken(null);
+    saveCachedUser(null);
     setToken(null);
     setUser(null);
     disconnectSocket();
@@ -121,13 +142,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       defaultRoute: string;
     }>('/auth/me', { token: t });
     setToken(t);
-    setUser(
-      normalizeUser(me, {
-        permissions: me.permissions,
-        defaultRoute: me.defaultRoute,
-        sessionId: me.sessionId,
-      }),
-    );
+    const u = normalizeUser(me, {
+      permissions: me.permissions,
+      defaultRoute: me.defaultRoute,
+      sessionId: me.sessionId,
+    });
+    setUser(u);
+    saveCachedUser(u);
     recordStaffLaunch();
     connectSocket(t);
   }, [clearSession]);
@@ -139,7 +160,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     refreshMe()
-      .catch(() => clearSession())
+      .catch((err) => {
+        if (isNetworkFailure(err)) {
+          const cached = loadCachedUser();
+          if (cached) {
+            setToken(t);
+            setUser(cached);
+            return;
+          }
+        }
+        clearSession();
+      })
       .finally(() => setLoading(false));
   }, [refreshMe, clearSession]);
 

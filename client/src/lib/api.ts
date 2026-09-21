@@ -1,3 +1,5 @@
+import { getStaffRead, putStaffRead } from '@/lib/staffReadCache';
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -35,12 +37,27 @@ type RequestOpts = {
   token?: string | null;
   public?: boolean;
   headers?: Record<string, string>;
+  /** Skip IndexedDB read-cache (rare). */
+  skipReadCache?: boolean;
 };
+
+export function isNetworkFailure(err: unknown): boolean {
+  if (err instanceof TypeError) return true;
+  if (err instanceof ApiError && (err.status === 0 || err.status >= 500))
+    return true;
+  const msg = err instanceof Error ? err.message : '';
+  return /failed to fetch|networkerror|network request failed|offline/i.test(
+    msg,
+  );
+}
 
 export async function api<T = unknown>(
   path: string,
   opts: RequestOpts = {},
 ): Promise<T> {
+  const method = (
+    opts.method ?? (opts.body !== undefined ? 'POST' : 'GET')
+  ).toUpperCase();
   const headers: Record<string, string> = {
     Accept: 'application/json',
     ...opts.headers,
@@ -51,36 +68,51 @@ export async function api<T = unknown>(
   const token = opts.public ? null : (opts.token ?? getStoredToken());
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${baseUrl()}${path.startsWith('/') ? path : `/${path}`}`, {
-    method: opts.method ?? (opts.body !== undefined ? 'POST' : 'GET'),
-    headers,
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-  });
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const useReadCache = method === 'GET' && !opts.skipReadCache;
 
-  const text = await res.text();
-  let data: unknown = null;
-  if (text) {
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = text;
+  try {
+    const res = await fetch(`${baseUrl()}${normalizedPath}`, {
+      method,
+      headers,
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+    });
+
+    const text = await res.text();
+    let data: unknown = null;
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = text;
+      }
     }
-  }
 
-  if (!res.ok) {
-    const message =
-      typeof data === 'object' &&
-      data &&
-      'message' in data &&
-      (data as { message: unknown }).message
-        ? Array.isArray((data as { message: unknown }).message)
-          ? ((data as { message: string[] }).message).join(', ')
-          : String((data as { message: unknown }).message)
-        : res.statusText || 'Request failed';
-    throw new ApiError(message, res.status, data);
-  }
+    if (!res.ok) {
+      const message =
+        typeof data === 'object' &&
+        data &&
+        'message' in data &&
+        (data as { message: unknown }).message
+          ? Array.isArray((data as { message: unknown }).message)
+            ? ((data as { message: string[] }).message).join(', ')
+            : String((data as { message: unknown }).message)
+          : res.statusText || 'Request failed';
+      throw new ApiError(message, res.status, data);
+    }
 
-  return data as T;
+    if (useReadCache) {
+      void putStaffRead(normalizedPath, token, data);
+    }
+
+    return data as T;
+  } catch (err) {
+    if (useReadCache && isNetworkFailure(err)) {
+      const cached = await getStaffRead<T>(normalizedPath, token);
+      if (cached !== undefined) return cached;
+    }
+    throw err;
+  }
 }
 
 export async function apiBlob(

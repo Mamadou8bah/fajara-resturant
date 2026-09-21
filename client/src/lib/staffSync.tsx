@@ -25,6 +25,7 @@ import {
 } from '@/lib/staffMutate';
 import { useAuth } from '@/lib/auth';
 import { notifyStaffDataChanged } from '@/lib/socket';
+import { warmStaffReadCaches } from '@/lib/warmStaffReads';
 
 type SyncCtx = {
   entries: OfflineWriteEntry[];
@@ -72,6 +73,7 @@ export function StaffSyncProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (token && user) {
       resumeFlushAfterAuth();
+      warmStaffReadCaches(user.permissions);
       void flushOfflineQueue().then((r) => {
         if (r.synced > 0) notifyStaffDataChanged();
         void refresh();

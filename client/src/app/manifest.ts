@@ -85,7 +85,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   return {
     name,
     short_name: shortName.slice(0, 12),
-    description: `${name} staff PWA & guest menu`,
+    description: `${name} staff app`,
     id: '/',
     start_url: '/',
     scope: '/',

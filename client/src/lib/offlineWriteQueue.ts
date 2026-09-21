@@ -21,7 +21,8 @@ export type OfflineWriteEntry = {
 };
 
 const DB_NAME = 'fajara-offline';
-const DB_VERSION = 1;
+/** Keep in sync with staffReadCache.ts (adds `reads` store). */
+const DB_VERSION = 2;
 const STORE = 'writes';
 
 type Listener = () => void;
@@ -49,6 +50,11 @@ function openDb(): Promise<IDBDatabase> {
         const store = db.createObjectStore(STORE, { keyPath: 'id' });
         store.createIndex('createdAt', 'createdAt', { unique: false });
         store.createIndex('status', 'status', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('reads')) {
+        const reads = db.createObjectStore('reads', { keyPath: 'key' });
+        reads.createIndex('updatedAt', 'updatedAt', { unique: false });
+        reads.createIndex('path', 'path', { unique: false });
       }
     };
     req.onsuccess = () => resolve(req.result);

@@ -1,4 +1,4 @@
-/** PWA / Web Push helpers (staff + guest, including iOS Home Screen). */
+/** PWA / Web Push helpers (staff: Android + iOS Home Screen; guest: in-tab / Android). */
 
 const DISMISS_INSTALL_KEY = 'fajara_push_install_dismissed';
 const DISMISS_ENABLE_KEY = 'fajara_push_enable_dismissed';

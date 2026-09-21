@@ -1,6 +1,6 @@
 'use client';
 
-import { api, ApiError, getStoredToken } from '@/lib/api';
+import { api, ApiError, getStoredToken, isNetworkFailure } from '@/lib/api';
 import {
   enqueueWrite,
   isLikelyOffline,
@@ -14,6 +14,7 @@ import {
   type OfflineScope,
   type OfflineWriteEntry,
 } from '@/lib/offlineWriteQueue';
+import { invalidateStaffReads } from '@/lib/staffReadCache';
 
 export type StaffMutateOpts = {
   method?: string;
@@ -66,11 +67,34 @@ function emitFlush() {
 }
 
 function networkFailure(err: unknown): boolean {
-  if (err instanceof TypeError) return true;
-  if (err instanceof ApiError && (err.status === 0 || err.status >= 500))
-    return true;
-  const msg = err instanceof Error ? err.message : '';
-  return /failed to fetch|network|offline/i.test(msg);
+  return isNetworkFailure(err);
+}
+
+function readPrefixesToInvalidate(path: string): string[] {
+  const p = (path.split('?')[0] ?? path).replace(/\/$/, '') || '/';
+  if (p.startsWith('/payments') || p.includes('/settle')) {
+    return ['/payments', '/orders', '/sessions', '/reports', '/dashboard'];
+  }
+  if (p.startsWith('/orders') || p.startsWith('/kitchen')) {
+    return ['/orders', '/kitchen', '/sessions', '/dashboard'];
+  }
+  if (p.startsWith('/sessions') || p.startsWith('/tables')) {
+    return ['/sessions', '/tables', '/orders', '/dashboard'];
+  }
+  if (p.startsWith('/menu')) return ['/menu', '/guest'];
+  if (p.startsWith('/inventory') || p.startsWith('/recipes') || p.startsWith('/production') || p.startsWith('/suppliers')) {
+    return ['/inventory', '/recipes', '/production', '/suppliers'];
+  }
+  if (p.startsWith('/employees') || p.startsWith('/shifts') || p.startsWith('/payroll')) {
+    return ['/employees', '/shifts', '/payroll'];
+  }
+  if (p.startsWith('/settings')) return ['/settings'];
+  const root = `/${p.split('/').filter(Boolean)[0] ?? ''}`;
+  return root === '/' ? [] : [root];
+}
+
+async function afterSuccessfulWrite(path: string) {
+  await invalidateStaffReads(readPrefixesToInvalidate(path));
 }
 
 /**
@@ -157,7 +181,9 @@ export async function staffMutate<T = unknown>(
   }
 
   try {
-    return await send();
+    const result = await send();
+    void afterSuccessfulWrite(path);
+    return result;
   } catch (err) {
     if (networkFailure(err)) {
       return enqueue();
@@ -212,6 +238,7 @@ export async function flushOfflineQueue(): Promise<{
           },
         });
         await removeWrite(entry.id);
+        void afterSuccessfulWrite(entry.path);
         synced += 1;
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
