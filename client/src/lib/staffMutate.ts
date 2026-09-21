@@ -3,6 +3,7 @@
 import { api, ApiError, getStoredToken, isNetworkFailure } from '@/lib/api';
 import {
   enqueueWrite,
+  findOpenWrite,
   isLikelyOffline,
   labelForPath,
   listWrites,
@@ -157,6 +158,17 @@ export async function staffMutate<T = unknown>(
     });
 
   const enqueue = async () => {
+    const existing = await findOpenWrite(method, path);
+    if (existing) {
+      if (opts.optimisticResult !== undefined) {
+        return opts.optimisticResult as T;
+      }
+      return {
+        queued: true,
+        clientRequestId: existing.clientRequestId,
+        queueId: existing.id,
+      } satisfies QueuedResult;
+    }
     const row = await enqueueWrite({
       method,
       path,
@@ -241,6 +253,17 @@ export async function flushOfflineQueue(): Promise<{
         void afterSuccessfulWrite(entry.path);
         synced += 1;
       } catch (err) {
+        // Already-applied kitchen/serve transitions (stale duplicate queue).
+        if (
+          err instanceof ApiError &&
+          err.status === 400 &&
+          /cannot transition item from (\w+) to \1/i.test(err.message)
+        ) {
+          await removeWrite(entry.id);
+          void afterSuccessfulWrite(entry.path);
+          synced += 1;
+          continue;
+        }
         if (err instanceof ApiError && err.status === 401) {
           pausedForAuth = true;
           await updateWrite(entry.id, {

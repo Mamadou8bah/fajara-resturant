@@ -12,9 +12,11 @@ import {
 } from '@/components/ui';
 import { ConfirmActionModal } from '@/components/ui/ConfirmActionModal';
 import { useAuth } from '@/lib/auth';
+import { getStoredToken } from '@/lib/api';
 import { formatGmd } from '@/lib/money';
 import { useStaffRealtimeRefresh } from '@/lib/useStaffRealtimeRefresh';
 import { isQueuedResult } from '@/lib/staffMutate';
+import { putStaffRead } from '@/lib/staffReadCache';
 import { PendingSyncBadge } from '@/components/PendingSyncBadge';
 import { addGuest, closeSession } from '@/features/floor/api';
 import {
@@ -604,8 +606,24 @@ export function OrdersScreen() {
     setError(null);
     try {
       await serveOrderItem(itemId);
+      // Patch local + cache so offline reload does not bring the Serve button back.
+      setSessions((prev) => {
+        const next = prev.map((s) => ({
+          ...s,
+          orders: s.orders.map((o) => ({
+            ...o,
+            items: o.items.map((it) =>
+              it.id === itemId ? { ...it, status: 'served' as const } : it,
+            ),
+          })),
+        }));
+        void putStaffRead('/orders/waiter-tables', getStoredToken(), next);
+        return next;
+      });
       setFlash('Marked served');
-      await load();
+      if (typeof navigator === 'undefined' || navigator.onLine) {
+        await load();
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Serve failed');
     } finally {

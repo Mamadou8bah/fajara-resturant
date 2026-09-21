@@ -181,9 +181,7 @@ export function FloorScreen() {
       if (statusFilter !== 'ALL' && t.status !== statusFilter) return false;
       if (ownershipFilter === 'mine') {
         if (t.status === 'NEEDS_CLEANING') {
-          // Own dirty tables (or unassigned last visit).
-          const clearer = t.clearingWaiter?.id;
-          if (clearer && clearer !== user?.id) return false;
+          // Any waiter may clear dirty tables once they need cleaning.
           return true;
         }
         if (!t.activeSession) return false;
@@ -390,19 +388,15 @@ export function FloorScreen() {
         )}
 
         {selected.status === 'NEEDS_CLEANING' ? (
-          (user?.role !== 'WAITER' ||
-            !selected.clearingWaiter?.id ||
-            selected.clearingWaiter.id === user?.id) && (
-            <Button
-              className="w-full text-base"
-              disabled={busy}
-              busy={busyKey === 'clean'}
-              busyLabel="Clearing…"
-              onClick={() => void onClean()}
-            >
-              Clear table (cleaned)
-            </Button>
-          )
+          <Button
+            className="w-full text-base"
+            disabled={busy}
+            busy={busyKey === 'clean'}
+            busyLabel="Clearing…"
+            onClick={() => void onClean()}
+          >
+            Clear table (cleaned)
+          </Button>
         ) : null}
 
         {selected.activeSession ? (

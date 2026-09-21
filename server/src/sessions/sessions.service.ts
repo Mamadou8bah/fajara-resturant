@@ -312,26 +312,6 @@ export class SessionsService {
       throw new BadRequestException('Table is not awaiting cleaning');
     }
 
-    // Waiters may only free tables from visits they served (managers/owners: any).
-    if (actor?.role === 'WAITER') {
-      const lastClosed = await this.prisma.tableSession.findFirst({
-        where: {
-          tableId,
-          status: SessionStatus.CLOSED,
-        },
-        orderBy: { closedAt: 'desc' },
-        select: { waiterId: true },
-      });
-      if (
-        lastClosed?.waiterId &&
-        lastClosed.waiterId !== actor.id
-      ) {
-        throw new ForbiddenException(
-          'You can only clear tables assigned to you',
-        );
-      }
-    }
-
     const updated = await this.prisma.diningTable.update({
       where: { id: tableId },
       data: { status: TableStatus.FREE },

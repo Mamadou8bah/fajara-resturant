@@ -171,6 +171,26 @@ export async function pendingCount(): Promise<number> {
     .length;
 }
 
+/** Find an unfinished queue row for the same mutation (dedupe double-taps offline). */
+export async function findOpenWrite(
+  method: string,
+  path: string,
+): Promise<OfflineWriteEntry | null> {
+  const rows = await listWrites();
+  const m = method.toUpperCase();
+  const p = path.startsWith('/') ? path : `/${path}`;
+  return (
+    rows.find(
+      (r) =>
+        r.method.toUpperCase() === m &&
+        r.path === p &&
+        (r.status === 'pending' ||
+          r.status === 'syncing' ||
+          r.status === 'failed'),
+    ) ?? null
+  );
+}
+
 export function isLikelyOffline(): boolean {
   if (typeof navigator === 'undefined') return false;
   return !navigator.onLine;

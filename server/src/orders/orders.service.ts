@@ -1272,6 +1272,16 @@ export class OrdersService {
       const item = await this.loadItem(tx, itemId);
       const from = item.status as OrderItemState;
       const to = toStatus as OrderItemState;
+
+      // Idempotent replay (offline queue / double-tap): already at target = success.
+      if (from === to) {
+        return {
+          item,
+          sessionId: item.order.sessionId,
+          noop: true as const,
+        };
+      }
+
       if (!canTransitionItem(from, to)) {
         throw new BadRequestException(
           `Cannot transition item from ${from} to ${to}`,
@@ -1305,8 +1315,16 @@ export class OrdersService {
         description: `${item.nameSnapshot}: ${friendlyStatus(from)} → ${friendlyStatus(to)}`,
       });
 
-      return { item: updated, sessionId: item.order.sessionId };
+      return {
+        item: updated,
+        sessionId: item.order.sessionId,
+        noop: false as const,
+      };
     });
+
+    if ('noop' in result && result.noop) {
+      return result.item;
+    }
 
     this.emitOrderRooms(result.sessionId, 'order_item.updated', result.item);
     if (toStatus === OrderItemStatus.preparing) {
