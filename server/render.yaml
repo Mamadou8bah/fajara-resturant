@@ -41,8 +41,12 @@ services:
       # Keep install from skipping build tools when NODE_ENV=production.
       - key: PNPM_PRODUCTION
         value: "false"
-      # Neon pooled URL (do not commit). Paste in Render → Environment.
+      # Neon pooled URL for the running API (do not commit).
       - key: DATABASE_URL
+        sync: false
+      # Neon direct (non-pooler) URL for migrations. If unset, start scripts
+      # derive it by stripping "-pooler" from DATABASE_URL.
+      - key: DIRECT_URL
         sync: false
       - key: JWT_SECRET
         generateValue: true

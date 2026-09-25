@@ -28,10 +28,11 @@ API defaults to `http://localhost:4000` (`/api`, `/realtime`).
 2. Use Blueprint [`render.yaml`](./render.yaml) (monorepo path: `server/render.yaml`).
 3. Set env from [`.env.staging.hosted.example`](./.env.staging.hosted.example):
    - `DATABASE_URL` — Neon **pooled** connection string
+   - `DIRECT_URL` — Neon **direct** (non-pooler) string for migrations (optional; auto-derived by stripping `-pooler` if unset)
    - `SEED_OWNER_PASSWORD`
    - `CORS_ORIGIN` / `PUBLIC_WEB_URL` — web app HTTPS origin (Netlify)
    - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` — Web Push (`npx web-push generate-vapid-keys`)
-4. Deploy — pre-deploy runs `pnpm migrate:deploy && pnpm seed`.
+4. Deploy — pre-deploy / start runs `migrate:deploy` (via direct URL) + `seed`.
 
 Health check: `GET /api/health`
 
