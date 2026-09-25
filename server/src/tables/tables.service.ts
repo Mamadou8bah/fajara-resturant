@@ -197,9 +197,9 @@ export class TablesService {
       const floor =
         (await this.settings.get<{ requireCleaningAfterClose?: boolean }>(
           'floor',
-          { requireCleaningAfterClose: true },
-        )) ?? { requireCleaningAfterClose: true };
-      if (floor.requireCleaningAfterClose !== false) {
+          { requireCleaningAfterClose: false },
+        )) ?? { requireCleaningAfterClose: false };
+      if (floor.requireCleaningAfterClose === true) {
         throw new BadRequestException(
           'Mark the table cleaned from the floor (cleaning workflow) instead of forcing Free',
         );

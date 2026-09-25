@@ -63,6 +63,7 @@ export type TillSession = {
   variance?: string | number | null;
   deviceLabel?: string | null;
   notes?: string | null;
+  pendingVarianceClose?: boolean;
   movements: {
     id: string;
     type: string;
@@ -299,15 +300,42 @@ export function openTill(body: {
 export function closeTill(body: {
   actualCash: number;
   notes?: string;
-  approverEmployeeId?: string;
-  approverPin?: string;
 }) {
-  return staffMutate<TillSession>('/till/close', {
+  return staffMutate<
+    | TillSession
+    | {
+        ok: true;
+        pendingApproval: true;
+        notified: number;
+        message: string;
+        expectedCash: string;
+        actualCash: string;
+        variance: string;
+      }
+  >('/till/close', {
     method: 'POST',
     body,
     scope: 'MUTATION',
     label: 'Close till',
     requireConfirmDiscard: true,
+  });
+}
+
+export function approveTillVarianceClose(notificationId: string) {
+  return staffMutate('/till/variance-close/approve', {
+    method: 'POST',
+    body: { notificationId },
+    scope: 'MUTATION',
+    label: 'Approve till close',
+  });
+}
+
+export function declineTillVarianceClose(notificationId: string) {
+  return staffMutate('/till/variance-close/decline', {
+    method: 'POST',
+    body: { notificationId },
+    scope: 'MUTATION',
+    label: 'Decline till close',
   });
 }
 

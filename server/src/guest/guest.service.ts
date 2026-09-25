@@ -15,10 +15,12 @@ import { PaymentsService } from '../payments/payments.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { SettingsService } from '../settings/settings.service';
+import { SessionsService } from '../sessions/sessions.service';
 import { resolveAppEnv } from '../common/env';
 import {
   GuestCallWaiterDto,
   GuestJoinDto,
+  GuestLeaveDto,
   GuestSubmitOrderDto,
 } from './dto/guest.dto';
 
@@ -34,6 +36,7 @@ export class GuestService {
     private readonly activity: ActivityLogService,
     private readonly shiftsLookup: ShiftsLookupService,
     private readonly settings: SettingsService,
+    private readonly sessions: SessionsService,
   ) {}
 
   async resolveMenuByToken(token: string) {
@@ -196,6 +199,7 @@ export class GuestService {
         const existingGuest = await tx.guest.findFirst({
           where: {
             deviceToken: incomingDevice,
+            leftAt: null,
             session: { status: SessionStatus.OPEN },
           },
           include: {
@@ -261,7 +265,8 @@ export class GuestService {
       }
 
       const seats = qr.table.seats;
-      const currentCount = session.guestCount ?? session.guests.length ?? 0;
+      const seated = session.guests.filter((g) => !g.leftAt);
+      const currentCount = seated.length;
       if (currentCount >= seats) {
         throw new BadRequestException(
           `Table ${qr.table.number} is full (${seats} seats). Ask staff if you need another table.`,
@@ -283,13 +288,13 @@ export class GuestService {
           sessionId: session.id,
           displayName: dto.displayName?.trim() || null,
           deviceToken,
-          sortOrder: session.guests.length,
+          sortOrder: seated.length,
         },
       });
 
       await tx.tableSession.update({
         where: { id: session.id },
-        data: { guestCount: { increment: 1 } },
+        data: { guestCount: currentCount + 1 },
       });
 
       return {
@@ -429,6 +434,28 @@ export class GuestService {
     });
 
     return { ok: true, notificationId: primaryNotificationId };
+  }
+
+  /** Guest leaves on their own after settling — frees the seat for someone else. */
+  async leave(dto: GuestLeaveDto) {
+    const qr = await this.resolveToken(dto.token);
+    const device = dto.deviceToken.trim();
+    const guest = await this.prisma.guest.findFirst({
+      where: {
+        deviceToken: device,
+        leftAt: null,
+        session: {
+          tableId: qr.tableId,
+          status: SessionStatus.OPEN,
+        },
+      },
+    });
+    if (!guest) {
+      throw new NotFoundException(
+        'No active visit for this device on this table',
+      );
+    }
+    return this.sessions.removeGuest(guest.sessionId, guest.id);
   }
 
   async submitOrder(dto: GuestSubmitOrderDto) {

@@ -6,6 +6,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { OrdersModule } from '../orders/orders.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { RealtimeModule } from '../realtime/realtime.module';
+import { SessionsModule } from '../sessions/sessions.module';
 import { SettingsModule } from '../settings/settings.module';
 import { GuestController } from './guest.controller';
 import { GuestService } from './guest.service';
@@ -20,6 +21,7 @@ import { GuestService } from './guest.service';
     RealtimeModule,
     CommonServicesModule,
     SettingsModule,
+    SessionsModule,
   ],
   controllers: [GuestController],
   providers: [GuestService],

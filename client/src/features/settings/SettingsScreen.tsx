@@ -51,6 +51,7 @@ import {
   asObj,
   DEFAULT_APPEARANCE,
   DEFAULT_FINANCE,
+  DEFAULT_FLOOR,
   DEFAULT_INVENTORY,
   DEFAULT_MENU,
   DEFAULT_NOTIFICATIONS,
@@ -64,6 +65,7 @@ import {
   SETTINGS_SECTIONS,
   type AppearanceSettings,
   type FinanceSettings,
+  type FloorSettings,
   type InventoryConsumption,
   type MenuSettings,
   type NotificationsSettings,
@@ -212,6 +214,7 @@ export function SettingsScreen() {
   const [pinLockout, setPinLockout] = useState<PinLockout>(DEFAULT_PIN);
   const [inventory, setInventory] =
     useState<InventoryConsumption>(DEFAULT_INVENTORY);
+  const [floor, setFloor] = useState<FloorSettings>(DEFAULT_FLOOR);
   const [kitchenNoLock, setKitchenNoLock] = useState(true);
   const [inactivityLockMinutes, setInactivityLockMinutes] = useState(10);
   const [tillVariance, setTillVariance] = useState(50);
@@ -291,6 +294,7 @@ export function SettingsScreen() {
     setShiftsHours(asObj(s.shiftsHours, DEFAULT_SHIFTS));
     setPinLockout(asObj(s.pinLockout, DEFAULT_PIN));
     setInventory(asObj(s.inventoryConsumption, DEFAULT_INVENTORY));
+    setFloor(asObj(s.floor, DEFAULT_FLOOR));
     setKitchenNoLock(Boolean(s.kitchenNoLock ?? true));
     setInactivityLockMinutes(Number(s.inactivityLockMinutes ?? 10));
     setTillVariance(Number(s.tillVarianceApprovalThreshold ?? 50));
@@ -1655,6 +1659,41 @@ export function SettingsScreen() {
 
             {section === 'tables' && canTables ? (
               <>
+                <Panel>
+                  <h2 className="mb-1 font-display text-lg font-bold">
+                    Floor workflow
+                  </h2>
+                  <p className="mb-4 text-sm text-muted">
+                    Control what happens after a visit is paid or cleared.
+                  </p>
+                  <Toggle
+                    label={
+                      floor.requireCleaningAfterClose
+                        ? 'Require cleaning before next guests — On'
+                        : 'Require cleaning before next guests — Off'
+                    }
+                    checked={floor.requireCleaningAfterClose}
+                    onChange={(v) =>
+                      setFloor((f) => ({
+                        ...f,
+                        requireCleaningAfterClose: v,
+                      }))
+                    }
+                  />
+                  <p className="mt-2 text-xs text-muted">
+                    Off: table goes Free as soon as the visit ends — ready for
+                    the next party. On: staff must tap Clear table (cleaned)
+                    first. You can still mark a table for cleaning when clearing
+                    if needed.
+                  </p>
+                  <SectionSave
+                    busy={busy}
+                    label="Save floor settings"
+                    onSave={() => {
+                      void saveKeys([['floor', floor]], 'Floor settings');
+                    }}
+                  />
+                </Panel>
                 <Panel>
                   <h2 className="mb-1 font-display text-lg font-bold">
                     Tables

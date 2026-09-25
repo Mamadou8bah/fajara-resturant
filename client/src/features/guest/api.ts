@@ -268,6 +268,18 @@ export function guestCallWaiter(token: string, guestId?: string) {
   });
 }
 
+export function guestLeave(token: string, deviceToken: string) {
+  return api<{
+    guestId: string;
+    remainingSeated: number;
+    tableStatus: string | null;
+  }>('/guest/leave', {
+    method: 'POST',
+    public: true,
+    body: { token, deviceToken },
+  });
+}
+
 export function guestSubmitOrder(body: {
   clientRequestId: string;
   token: string;

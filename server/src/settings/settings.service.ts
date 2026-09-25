@@ -141,7 +141,7 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
   guestDisplayNameRetentionDays: 90,
   floor: {
     /** When true, closed/settled tables go to NEEDS_CLEANING until marked clean (SES-003). */
-    requireCleaningAfterClose: true,
+    requireCleaningAfterClose: false,
   },
   rolePermissions: ROLE_PERMISSIONS,
 };

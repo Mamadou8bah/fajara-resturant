@@ -12,6 +12,7 @@ export type NotifySoundKind =
   | 'remake.approved'
   | 'void.request'
   | 'comp.request'
+  | 'till.variance_close.request'
   | 'default';
 
 const DEFAULT_LINES: Record<NotifySoundKind, string> = {
@@ -26,6 +27,8 @@ const DEFAULT_LINES: Record<NotifySoundKind, string> = {
   'remake.approved': 'Remake approved. Please remake the dish.',
   'void.request': 'A void request needs your approval.',
   'comp.request': 'A complimentary item request needs your approval.',
+  'till.variance_close.request':
+    'A till close with a cash difference needs your approval.',
   default: 'New notification.',
 };
 
@@ -41,6 +44,7 @@ const BEEP_FREQ: Record<NotifySoundKind, number[]> = {
   'remake.approved': [523, 659, 784],
   'void.request': [880, 660, 440],
   'comp.request': [740, 880, 990],
+  'till.variance_close.request': [660, 550, 440],
   default: [660, 880],
 };
 

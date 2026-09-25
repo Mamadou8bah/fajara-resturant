@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { SessionStatus, TableStatus, Prisma } from '@prisma/client';
+import { SessionStatus, TableStatus, OrderItemStatus, Prisma } from '@prisma/client';
 import { ActivityLogService } from '../audit/activity-log.service';
 import { AuthUser } from '../common/decorators/auth.decorators';
 import { randomToken } from '../common/utils/ids';
@@ -42,9 +42,9 @@ export class SessionsService {
     const floor =
       (await this.settings.get<{ requireCleaningAfterClose?: boolean }>(
         'floor',
-        { requireCleaningAfterClose: true },
-      )) ?? { requireCleaningAfterClose: true };
-    return floor.requireCleaningAfterClose !== false;
+        { requireCleaningAfterClose: false },
+      )) ?? { requireCleaningAfterClose: false };
+    return floor.requireCleaningAfterClose === true;
   }
 
   async openSession(dto: OpenSessionDto, actorId?: string) {
@@ -467,6 +467,135 @@ export class SessionsService {
     return guest;
   }
 
+  /**
+   * One guest leaves independently — frees a seat without ending the whole visit.
+   * Guest must have no unpaid items. When the last seated guest leaves and the
+   * bill is clear, the table is released (cleaning / Free per floor settings).
+   */
+  async removeGuest(
+    sessionId: string,
+    guestId: string,
+    actorId?: string,
+  ) {
+    const session = await this.prisma.tableSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        table: true,
+        guests: true,
+        orders: { include: { items: true } },
+      },
+    });
+    if (!session) throw new NotFoundException('Session not found');
+    if (session.status !== SessionStatus.OPEN) {
+      throw new BadRequestException('Session is not open');
+    }
+
+    const guest = session.guests.find((g) => g.id === guestId);
+    if (!guest) throw new NotFoundException('Guest not found on this session');
+    if (guest.leftAt) {
+      throw new BadRequestException('Guest already left');
+    }
+
+    const unpaid = session.orders
+      .flatMap((o) => o.items)
+      .filter(
+        (item) =>
+          item.guestId === guestId &&
+          !item.settledTransactionId &&
+          item.status !== OrderItemStatus.cancelled &&
+          item.status !== OrderItemStatus.voided &&
+          item.status !== OrderItemStatus.comped,
+      );
+    if (unpaid.length > 0) {
+      throw new BadRequestException(
+        'Guest still has unpaid items — settle their share first',
+      );
+    }
+
+    const requireCleaning = await this.requireCleaningAfterClose();
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.guest.update({
+        where: { id: guestId },
+        data: {
+          leftAt: new Date(),
+          deviceToken: null,
+        },
+      });
+
+      const remainingSeated = session.guests.filter(
+        (g) => g.id !== guestId && !g.leftAt,
+      ).length;
+
+      await tx.tableSession.update({
+        where: { id: sessionId },
+        data: {
+          guestCount: Math.max(0, remainingSeated),
+        },
+      });
+
+      const remainingUnpaid = await tx.orderItem.count({
+        where: {
+          order: { sessionId },
+          settledTransactionId: null,
+          status: {
+            notIn: [
+              OrderItemStatus.cancelled,
+              OrderItemStatus.voided,
+              OrderItemStatus.comped,
+            ],
+          },
+        },
+      });
+
+      let tableStatus: TableStatus | null = null;
+      if (remainingSeated === 0 && remainingUnpaid === 0) {
+        tableStatus = await this.finalizeSettledSessionInTx(
+          tx,
+          sessionId,
+          session.tableId,
+          requireCleaning,
+        );
+      }
+
+      return {
+        guestId,
+        remainingSeated,
+        tableStatus,
+        tableId: session.tableId,
+      };
+    });
+
+    await this.activityLog.record({
+      actorId,
+      actionType: 'session.guest.leave',
+      entityType: 'Guest',
+      entityId: guestId,
+      description: `Guest left table ${session.table.number}`,
+      metadata: {
+        remainingSeated: result.remainingSeated,
+        tableStatus: result.tableStatus,
+      },
+    });
+
+    this.realtime.emitToRoom(`session:${sessionId}`, 'guest.left', {
+      guestId,
+      sessionId,
+      remainingSeated: result.remainingSeated,
+    });
+    this.realtime.emitToRoom('floor', 'session.updated', {
+      sessionId,
+      tableId: result.tableId,
+      tableStatus: result.tableStatus,
+    });
+
+    if (result.tableStatus) {
+      await this.notifications.resolveClaimableForSession(sessionId);
+    }
+
+    return result;
+  }
+
   async getFloorPlan() {
     const tables = await this.prisma.diningTable.findMany({
       where: { isArchived: false },
@@ -479,7 +608,13 @@ export class SessionsService {
           include: {
             waiter: { select: { id: true, fullName: true } },
             guests: {
-              select: { id: true, displayName: true, sortOrder: true },
+              where: { leftAt: null },
+              select: {
+                id: true,
+                displayName: true,
+                sortOrder: true,
+                leftAt: true,
+              },
               orderBy: { sortOrder: 'asc' },
             },
             orders: {

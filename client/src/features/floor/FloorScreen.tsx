@@ -21,6 +21,8 @@ import {
 } from '@/lib/socket';
 import { formatGmd } from '@/lib/money';
 import { matchesQuery } from '@/lib/search';
+import { fetchSettings } from '@/features/settings/api';
+import { asObj, DEFAULT_FLOOR } from '@/features/settings/defaults';
 import {
   addGuest,
   closeSession,
@@ -28,6 +30,7 @@ import {
   markCleaningComplete,
   moveSession,
   openSession,
+  removeGuest,
   updateTableStatus,
   updateTablePosition,
   type FloorTable,
@@ -92,6 +95,7 @@ export function FloorScreen() {
     'mine' | 'unassigned' | 'all'
   >(user?.role === 'WAITER' ? 'mine' : 'all');
   const [arrangeMode, setArrangeMode] = useState(false);
+  const [requireCleaning, setRequireCleaning] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -108,6 +112,20 @@ export function FloorScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchSettings()
+      .then((s) => {
+        if (cancelled) return;
+        const floor = asObj(s.floor, DEFAULT_FLOOR);
+        setRequireCleaning(floor.requireCleaningAfterClose === true);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!token || !user) return;
@@ -290,6 +308,13 @@ export function FloorScreen() {
     setGuestName('');
   }
 
+  async function onRemoveGuest(guestId: string) {
+    if (!selected?.activeSession) return;
+    await run('leave', () =>
+      removeGuest(selected.activeSession!.id, guestId),
+    );
+  }
+
   async function onMove() {
     if (!selected?.activeSession || !moveToId) return;
     await run('move', () => moveSession(selected.activeSession!.id, moveToId));
@@ -301,9 +326,13 @@ export function FloorScreen() {
     await run('clean', () => markCleaningComplete(selected.id));
   }
 
-  async function onCloseTable() {
+  async function onCloseTable(needsCleaning = false) {
     if (!selected?.activeSession) return;
-    await run('close', () => closeSession(selected.activeSession!.id));
+    await run('close', () =>
+      closeSession(selected.activeSession!.id, {
+        needsCleaning: needsCleaning || undefined,
+      }),
+    );
   }
 
   async function onSetStatus(status: TableStatus) {
@@ -467,17 +496,46 @@ export function FloorScreen() {
                     disabled={busy || unpaid}
                     busy={busyKey === 'close'}
                     busyLabel="Clearing…"
-                    onClick={() => void onCloseTable()}
+                    onClick={() => void onCloseTable(false)}
                   >
-                    {unpaid ? 'Clear table (pay first)' : 'Clear table'}
+                    {unpaid
+                      ? 'Clear table (pay first)'
+                      : requireCleaning
+                        ? 'Clear table'
+                        : 'Clear table (ready now)'}
                   </Button>
+                  {!unpaid && !requireCleaning ? (
+                    <Button
+                      variant="outline"
+                      className="w-full text-base"
+                      disabled={busy}
+                      busy={busyKey === 'close'}
+                      busyLabel="Clearing…"
+                      onClick={() => void onCloseTable(true)}
+                    >
+                      Clear & mark for cleaning
+                    </Button>
+                  ) : null}
                 </div>
               );
             })()}
-            <ul className="space-y-1 text-sm">
+            <ul className="space-y-2 text-sm">
               {selected.activeSession.guests.map((g, i) => (
-                <li key={g.id}>
-                  {g.displayName?.trim() || `Guest ${i + 1}`}
+                <li
+                  key={g.id}
+                  className="flex items-center justify-between gap-2 rounded-xl bg-[#EDE6DA]/70 px-3 py-2"
+                >
+                  <span>
+                    {g.displayName?.trim() || `Guest ${i + 1}`}
+                  </span>
+                  <button
+                    type="button"
+                    className="shrink-0 text-xs font-semibold text-cta disabled:opacity-50"
+                    disabled={busy}
+                    onClick={() => void onRemoveGuest(g.id)}
+                  >
+                    Left
+                  </button>
                 </li>
               ))}
             </ul>

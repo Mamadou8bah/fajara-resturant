@@ -274,12 +274,14 @@ model TableSessionMove {
 }
 
 model Guest {
-  id          String   @id @default(uuid()) @db.Uuid
-  sessionId   String   @map("session_id") @db.Uuid
-  displayName String?  @map("display_name")
-  deviceToken String?  @unique @map("device_token")
-  sortOrder   Int      @default(0) @map("sort_order")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id          String    @id @default(uuid()) @db.Uuid
+  sessionId   String    @map("session_id") @db.Uuid
+  displayName String?   @map("display_name")
+  deviceToken String?   @unique @map("device_token")
+  sortOrder   Int       @default(0) @map("sort_order")
+  /** When set, guest has left — seat frees for someone else; visit can continue. */
+  leftAt      DateTime? @map("left_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   session    TableSession @relation(fields: [sessionId], references: [id])
   orderItems OrderItem[]

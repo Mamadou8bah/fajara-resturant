@@ -234,6 +234,7 @@ export function CheckoutScreen() {
 
   const [tab, setTab] = useState<Tab>('settle');
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
@@ -606,37 +607,34 @@ export function CheckoutScreen() {
     setBusyKey('close-till');
     setBusy(true);
     setError(null);
+    setInfo(null);
     try {
-      let approverEmployeeId: string | undefined;
-      let approverPin: string | undefined;
-      const expected = num(till?.expectedCash);
-      const actual = Number(actualCash);
-      if (Number.isFinite(actual) && Math.abs(actual - expected) > 50) {
-        const approval = await requestApproval({
-          title: 'Till variance approval',
-          description: `Variance vs expected ${formatGmd(expected)} needs manager PIN.`,
-        });
-        if (!approval) {
-          setBusy(false);
-          setBusyKey(null);
-          return;
-        }
-        approverEmployeeId = approval.approverEmployeeId;
-        approverPin = approval.approverPin;
-      }
       const closed = await closeTill({
-          actualCash: Number(actualCash),
-          notes: tillNotes || undefined,
-          approverEmployeeId,
-          approverPin,
-        });
+        actualCash: Number(actualCash),
+        notes: tillNotes || undefined,
+      });
       if (isQueuedResult(closed)) {
         setError('Till close queued offline — will sync when you reconnect');
         setActualCash('');
         setTillNotes('');
         return;
       }
-      setTill(closed);
+      if (
+        closed &&
+        typeof closed === 'object' &&
+        'pendingApproval' in closed &&
+        closed.pendingApproval
+      ) {
+        setInfo(
+          closed.message ||
+            'Sent to managers for approval — till stays open until they approve.',
+        );
+        setActualCash('');
+        setTillNotes('');
+        await loadTill();
+        return;
+      }
+      setTill(closed as TillSession);
       setActualCash('');
       setTillNotes('');
       await loadTill();
@@ -866,6 +864,18 @@ export function CheckoutScreen() {
     >
       {modal}
       {error ? <ErrorBanner message={error} onClose={() => setError(null)} /> : null}
+      {info ? (
+        <p className="mb-3 rounded-2xl bg-[#DCEBE4] px-4 py-3 text-sm font-medium text-ready">
+          {info}
+          <button
+            type="button"
+            className="ml-2 text-xs font-bold underline"
+            onClick={() => setInfo(null)}
+          >
+            Dismiss
+          </button>
+        </p>
+      ) : null}
 
       {tab === 'settle' ? (
         <div className="grid gap-4 md:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]">
@@ -962,8 +972,8 @@ export function CheckoutScreen() {
                     </h2>
                     <p className="mt-1 text-sm text-muted">
                       {settleGuestId
-                        ? 'Settling one guest — others stay open'
-                        : 'Settling all unpaid items together'}
+                        ? 'Settling one guest — table stays open for others'
+                        : 'Settling unpaid items — other seated guests stay until they leave or you clear'}
                       {bill.unsettledGuestCount > 0
                         ? ` · ${bill.unsettledGuestCount} guest share(s) open`
                         : ''}
@@ -1396,6 +1406,12 @@ export function CheckoutScreen() {
                     Opening {formatGmd(num(till.openingBalance))} ·{' '}
                     {till.movements.length} movements
                   </p>
+                  {till.pendingVarianceClose ? (
+                    <p className="rounded-xl bg-[#F7EDD4] px-3 py-2 text-sm font-medium text-ink">
+                      Close request sent — waiting for a manager to approve on
+                      their device. Till stays open until then.
+                    </p>
+                  ) : null}
                   <ul className="max-h-48 space-y-1 overflow-auto text-sm">
                     {till.movements.map((m) => (
                       <li key={m.id} className="flex justify-between gap-2">
@@ -1424,10 +1440,12 @@ export function CheckoutScreen() {
                   <Button
                     onClick={onCloseTill}
                     busy={busyKey === 'close-till'}
-                    disabled={busy}
+                    disabled={busy || Boolean(till.pendingVarianceClose)}
                     busyLabel="Closing…"
                   >
-                    Close till
+                    {till.pendingVarianceClose
+                      ? 'Waiting for manager…'
+                      : 'Close till'}
                   </Button>
                 </div>
               )}

@@ -90,6 +90,8 @@ const ACTIVITY_LABELS: Record<string, string> = {
   'till.adjustment_approved': 'Till adjustment approved',
   'till.close': 'Till closed',
   'till.open': 'Till opened',
+  'till.variance_close_requested': 'Till close requested (variance)',
+  'till.variance_close_declined': 'Till close declined',
 };
 
 const MOVEMENT_LABELS: Record<string, string> = {

@@ -14,6 +14,10 @@ import {
   markNotificationSeen,
   type StaffNotification,
 } from '@/features/orders/api';
+import {
+  approveTillVarianceClose,
+  declineTillVarianceClose,
+} from '@/features/checkout/api';
 
 function canAccept(n: StaffNotification) {
   if (!n.sessionId) return false;
@@ -26,7 +30,8 @@ function canApproveException(n: StaffNotification) {
   if (
     n.type !== 'remake.request' &&
     n.type !== 'void.request' &&
-    n.type !== 'comp.request'
+    n.type !== 'comp.request' &&
+    n.type !== 'till.variance_close.request'
   ) {
     return false;
   }
@@ -40,6 +45,7 @@ function canApproveException(n: StaffNotification) {
 function exceptionActionLabel(type?: string) {
   if (type === 'void.request') return 'void';
   if (type === 'comp.request') return 'comp';
+  if (type === 'till.variance_close.request') return 'till close';
   return 'remake';
 }
 
@@ -116,7 +122,11 @@ export function NotificationInbox() {
     setBusyId(n.id);
     setError(null);
     try {
-      await approveRemake(n.id);
+      if (n.type === 'till.variance_close.request') {
+        await approveTillVarianceClose(n.id);
+      } else {
+        await approveRemake(n.id);
+      }
       await load();
     } catch (e) {
       setError(
@@ -133,7 +143,11 @@ export function NotificationInbox() {
     setBusyId(n.id);
     setError(null);
     try {
-      await declineRemake(n.id);
+      if (n.type === 'till.variance_close.request') {
+        await declineTillVarianceClose(n.id);
+      } else {
+        await declineRemake(n.id);
+      }
       await load();
     } catch (e) {
       setError(
@@ -191,7 +205,7 @@ export function NotificationInbox() {
                 <div>
                   <p className="font-display text-lg font-bold">Notifications</p>
                   <p className="text-xs text-muted">
-                    Calls, voids, comps, remakes
+                    Calls, voids, comps, remakes, till closes
                   </p>
                 </div>
                 <button
@@ -228,7 +242,8 @@ export function NotificationInbox() {
                         openish
                           ? n.type === 'remake.request' ||
                             n.type === 'void.request' ||
-                            n.type === 'comp.request'
+                            n.type === 'comp.request' ||
+                            n.type === 'till.variance_close.request'
                             ? 'border-warn/50 bg-[#F7EDD4]'
                             : 'border-[#E0D5C4] bg-white'
                           : 'border-transparent bg-[#EDE6DA]/60'

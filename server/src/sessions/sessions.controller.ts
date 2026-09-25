@@ -82,4 +82,14 @@ export class SessionsController {
   ) {
     return this.sessions.addGuest(id, dto, user.id);
   }
+
+  @Post(':id/guests/:guestId/leave')
+  @RequirePermissions('orders.waiter', 'checkout.operate')
+  removeGuest(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('guestId', ParseUUIDPipe) guestId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.sessions.removeGuest(id, guestId, user.id);
+  }
 }

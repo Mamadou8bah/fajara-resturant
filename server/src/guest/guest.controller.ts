@@ -4,6 +4,7 @@ import { Public } from '../common/decorators/auth.decorators';
 import {
   GuestCallWaiterDto,
   GuestJoinDto,
+  GuestLeaveDto,
   GuestPriorOrdersQueryDto,
   GuestReceiptQueryDto,
   GuestSubmitOrderDto,
@@ -96,6 +97,13 @@ export class GuestController {
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   callWaiter(@Body() dto: GuestCallWaiterDto) {
     return this.guest.callWaiter(dto);
+  }
+
+  @Post('leave')
+  @Public()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  leave(@Body() dto: GuestLeaveDto) {
+    return this.guest.leave(dto);
   }
 
   @Post('orders')

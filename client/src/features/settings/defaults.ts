@@ -228,6 +228,15 @@ export const DEFAULT_INVENTORY: InventoryConsumption = {
   packagedAt: 'prepare',
 };
 
+export type FloorSettings = {
+  /** When true, closed/settled tables must be cleaned before Free. */
+  requireCleaningAfterClose: boolean;
+};
+
+export const DEFAULT_FLOOR: FloorSettings = {
+  requireCleaningAfterClose: false,
+};
+
 export function asObj<T extends object>(raw: unknown, fallback: T): T {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ...fallback };
   return { ...fallback, ...(raw as T) };

@@ -35,6 +35,7 @@ import {
   fetchPriorOrders,
   guestCallWaiter,
   guestJoin,
+  guestLeave,
   guestSubmitOrder,
   itemPrice,
   newClientRequestId,
@@ -861,6 +862,33 @@ export function GuestMenuScreen({
     }
   }
 
+  async function onLeaveTable() {
+    if (!session?.deviceToken) return;
+    if (!online) {
+      setError('You are offline. Reconnect to leave the table.');
+      return;
+    }
+    const unpaid = (prior?.items ?? []).some(
+      (i) => !i.settled && i.status !== 'cancelled' && i.status !== 'voided',
+    );
+    if (unpaid) {
+      setError('Settle your order with staff before leaving the table.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await guestLeave(token, session.deviceToken);
+      clearSession(token);
+      setToast('You left the table — enjoy the rest of your day');
+      setView('menu');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not leave table');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function goOrders() {
     setView('orders');
     if (session?.deviceToken) {
@@ -1439,7 +1467,7 @@ export function GuestMenuScreen({
                     ))}
                   </ul>
                   {group.items.some((i) => i.settled) ? (
-                    <div className="border-t border-[#E0D5C4] px-4 py-3">
+                    <div className="space-y-2 border-t border-[#E0D5C4] px-4 py-3">
                       <Button
                         variant="outline"
                         className="w-full"
@@ -1468,6 +1496,21 @@ export function GuestMenuScreen({
                       >
                         {receiptBusy ? 'Loading…' : 'View / download receipt'}
                       </Button>
+                      {group.items.every(
+                        (i) =>
+                          i.settled ||
+                          i.status === 'cancelled' ||
+                          i.status === 'voided',
+                      ) ? (
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          disabled={busy || !session?.deviceToken}
+                          onClick={() => void onLeaveTable()}
+                        >
+                          Leave table
+                        </Button>
+                      ) : null}
                     </div>
                   ) : null}
                 </section>

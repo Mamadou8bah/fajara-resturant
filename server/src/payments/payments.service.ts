@@ -82,7 +82,10 @@ export class PaymentsService {
     const session = await this.prisma.tableSession.findUnique({
       where: { id: sessionId },
       include: {
-        guests: { orderBy: { sortOrder: 'asc' } },
+        guests: {
+          where: { leftAt: null },
+          orderBy: { sortOrder: 'asc' },
+        },
         table: { select: { id: true, number: true, label: true } },
         orders: {
           orderBy: { submittedAt: 'asc' },
@@ -487,13 +490,18 @@ export class PaymentsService {
 
       let tableStatusAfter: TableStatus | null = null;
       if (remainingSessionItems === 0) {
-        // SES-003: fully paid visit closes and enters cleaning (or Free if disabled).
-        tableStatusAfter = await this.sessions.finalizeSettledSessionInTx(
-          tx,
-          session.id,
-          session.tableId,
-          requireCleaning,
-        );
+        // Guests are independent — only auto-close when nobody is still seated.
+        const seatedRemaining = session.guests.filter(
+          (g) => !(g as { leftAt?: Date | null }).leftAt,
+        ).length;
+        if (seatedRemaining <= 1) {
+          tableStatusAfter = await this.sessions.finalizeSettledSessionInTx(
+            tx,
+            session.id,
+            session.tableId,
+            requireCleaning,
+          );
+        }
       }
 
       const openTill = await tx.tillSession.findFirst({

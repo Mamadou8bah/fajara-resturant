@@ -11,6 +11,7 @@ import {
   OpenTillDto,
   TillAdjustmentDto,
   TillCashMovementDto,
+  TillVarianceCloseDecisionDto,
 } from './dto/till.dto';
 import { TillService } from './till.service';
 
@@ -43,6 +44,24 @@ export class TillController {
   @RequirePermissions('till.operate')
   close(@Body() dto: CloseTillDto, @CurrentUser() user: AuthUser) {
     return this.till.close(dto, user);
+  }
+
+  @Post('variance-close/approve')
+  @RequirePermissions('void.approve')
+  approveVarianceClose(
+    @Body() dto: TillVarianceCloseDecisionDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.till.approveVarianceClose(dto.notificationId, user.id);
+  }
+
+  @Post('variance-close/decline')
+  @RequirePermissions('void.approve')
+  declineVarianceClose(
+    @Body() dto: TillVarianceCloseDecisionDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.till.declineVarianceClose(dto.notificationId, user.id);
   }
 
   @Post('paid-in')

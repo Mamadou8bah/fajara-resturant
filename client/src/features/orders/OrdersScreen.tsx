@@ -323,7 +323,7 @@ export function OrdersScreen() {
     if (!selected || !canClearSelected) return;
     if (
       !window.confirm(
-        `Clear ${tableName(selected)}? Guests leave and the table goes to cleaning.`,
+        `Clear ${tableName(selected)}? Guests leave and the table is released.`,
       )
     ) {
       return;

@@ -45,6 +45,16 @@ export class GuestCallWaiterDto {
   guestId?: string;
 }
 
+export class GuestLeaveDto {
+  @IsString()
+  @MinLength(1)
+  token!: string;
+
+  @IsString()
+  @MinLength(8)
+  deviceToken!: string;
+}
+
 export class GuestOrderItemDto {
   @IsUUID()
   guestId!: string;

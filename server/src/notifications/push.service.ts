@@ -19,6 +19,7 @@ const PUSHABLE_TYPES = new Set([
   'remake.request',
   'void.request',
   'comp.request',
+  'till.variance_close.request',
 ]);
 
 const ROOM_ROLES: Record<string, Role[]> = {

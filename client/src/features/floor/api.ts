@@ -108,6 +108,15 @@ export function addGuest(sessionId: string, displayName?: string) {
   });
 }
 
+export function removeGuest(sessionId: string, guestId: string) {
+  return staffMutate(`/sessions/${sessionId}/guests/${guestId}/leave`, {
+    method: 'POST',
+    body: {},
+    scope: 'SESSION',
+    label: 'Guest left',
+  });
+}
+
 export function markCleaningComplete(tableId: string) {
   return staffMutate('/sessions/cleaning-complete', {
     method: 'POST',
@@ -118,10 +127,15 @@ export function markCleaningComplete(tableId: string) {
   });
 }
 
-export function closeSession(sessionId: string) {
+export function closeSession(
+  sessionId: string,
+  opts?: { needsCleaning?: boolean },
+) {
   return staffMutate(`/sessions/${sessionId}/close`, {
     method: 'POST',
-    body: {},
+    body: {
+      ...(opts?.needsCleaning === true ? { needsCleaning: true } : {}),
+    },
     scope: 'SESSION',
     label: 'Close session',
   });

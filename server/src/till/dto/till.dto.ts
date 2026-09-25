@@ -30,16 +30,6 @@ export class CloseTillDto {
   @IsOptional()
   @IsString()
   notes?: string;
-
-  @IsOptional()
-  @IsUUID()
-  approverEmployeeId?: string;
-
-  @IsOptional()
-  @IsString()
-  @Length(4, 4)
-  @Matches(/^\d{4}$/)
-  approverPin?: string;
 }
 
 export class TillCashMovementDto {
@@ -63,4 +53,9 @@ export class TillAdjustmentDto extends TillCashMovementDto {
   @Length(4, 4)
   @Matches(/^\d{4}$/)
   approverPin?: string;
+}
+
+export class TillVarianceCloseDecisionDto {
+  @IsUUID()
+  notificationId!: string;
 }
