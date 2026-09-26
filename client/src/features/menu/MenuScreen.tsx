@@ -200,7 +200,7 @@ export function MenuScreen() {
           description: itemForm.description || null,
         });
         setAllergenDraft('');
-        await load();
+        await load({ quiet: true });
       } else {
         const created = await createItem(body);
         if ('id' in created && created.id) {
@@ -209,7 +209,7 @@ export function MenuScreen() {
         setAllergenDraft('');
         // Keep the form open so staff can add Benachin-style customizations next.
         setMobileFormOpen(true);
-        await load();
+        await load({ quiet: true });
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save item failed');
@@ -486,6 +486,7 @@ export function MenuScreen() {
                       onChange={setItemQuery}
                       placeholder="Search name, station, allergen…"
                       className="min-w-0 w-full sm:max-w-xs"
+                      collapsible
                     />
                     <div className="chip-scroll">
                       <FilterSelect
@@ -584,7 +585,7 @@ export function MenuScreen() {
                                     await updateItem(it.id, {
                                       isSoldOut: !it.isSoldOut,
                                     });
-                                    await load();
+                                    await load({ quiet: true });
                                   } catch (e) {
                                     setError(
                                       e instanceof Error
@@ -731,7 +732,7 @@ export function MenuScreen() {
                               ?.modifierGroups ?? []
                           }
                           busy={busy}
-                          onChanged={load}
+                          onChanged={() => load({ quiet: true })}
                           onError={setError}
                         />
                       ) : null}
@@ -749,7 +750,7 @@ export function MenuScreen() {
                                 await updateItem(it.id, {
                                   isSoldOut: !it.isSoldOut,
                                 });
-                                await load();
+                                await load({ quiet: true });
                                 setMobileFormOpen(false);
                               } catch (e) {
                                 setError(

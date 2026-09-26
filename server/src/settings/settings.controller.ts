@@ -42,6 +42,8 @@ export class SettingsController {
     const finance = (all.finance as Record<string, unknown> | undefined) ?? {};
     const menuSettings =
       (all.menuSettings as Record<string, unknown> | undefined) ?? {};
+    const notifications =
+      (all.notifications as Record<string, unknown> | undefined) ?? {};
     return {
       restaurantName: all.restaurantName ?? 'Fajara Restaurant Services',
       currency: all.currency ?? 'GMD',
@@ -58,6 +60,10 @@ export class SettingsController {
         maxDiscountPct: finance.maxDiscountPct ?? 10,
       },
       menuSettings,
+      notifications: {
+        guestPushOn: notifications.guestPushOn !== false,
+        guestAnnounceOn: notifications.guestAnnounceOn !== false,
+      },
       appearance: all.appearance,
     };
   }

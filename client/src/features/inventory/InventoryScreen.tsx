@@ -110,6 +110,7 @@ export function InventoryScreen() {
   const [receiveUnit, setReceiveUnit] = useState('');
   const [receiveSupplierId, setReceiveSupplierId] = useState('');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierQuery, setSupplierQuery] = useState('');
   const [supplierForm, setSupplierForm] = useState({
     name: '',
     contact: '',
@@ -155,6 +156,64 @@ export function InventoryScreen() {
     () => stock.find((i) => i.id === selectedItemId) ?? null,
     [stock, selectedItemId],
   );
+
+  const filteredSuppliers = useMemo(() => {
+    const q = supplierQuery.trim().toLowerCase();
+    if (!q) return suppliers;
+    return suppliers.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        (s.contact ?? '').toLowerCase().includes(q) ||
+        (s.phone ?? '').toLowerCase().includes(q),
+    );
+  }, [suppliers, supplierQuery]);
+
+  function downloadLowStockPdf() {
+    const low = stock.filter(
+      (i) =>
+        i.lowStockThreshold != null &&
+        n(i.currentStock) <= n(i.lowStockThreshold),
+    );
+    const rows =
+      low.length === 0
+        ? '<tr><td colspan="4">No low-stock items</td></tr>'
+        : low
+            .map(
+              (i) =>
+                `<tr><td>${escapeHtml(i.name)}</td><td>${escapeHtml(i.type)}</td><td>${n(i.currentStock)} ${escapeHtml(i.baseUnit)}</td><td>${n(i.lowStockThreshold ?? 0)} ${escapeHtml(i.baseUnit)}</td></tr>`,
+            )
+            .join('');
+    const html = `<!doctype html><html><head><title>Low stock</title>
+      <style>
+        body{font-family:system-ui,sans-serif;padding:24px;color:#271A11}
+        h1{font-size:20px;margin:0 0 8px}
+        p{color:#6B5B4B;margin:0 0 16px;font-size:13px}
+        table{width:100%;border-collapse:collapse;font-size:13px}
+        th,td{border:1px solid #E0D5C4;padding:8px;text-align:left}
+        th{background:#F3ECE0}
+      </style></head><body>
+      <h1>Low stock report</h1>
+      <p>Generated ${new Date().toLocaleString()}</p>
+      <table><thead><tr><th>Item</th><th>Type</th><th>On hand</th><th>Threshold</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+      <script>window.onload=()=>{window.print()}</script>
+      </body></html>`;
+    const w = window.open('', '_blank', 'noopener,noreferrer,width=900,height=700');
+    if (!w) {
+      setError('Allow pop-ups to download the low-stock PDF');
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
+  }
+
+  function escapeHtml(s: string) {
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
 
   const loadStock = useCallback(async () => {
     const res = await listStock({
@@ -545,6 +604,13 @@ export function InventoryScreen() {
                       onClick={() => setLowOnly((v) => !v)}
                     >
                       Low only
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={() => downloadLowStockPdf()}
+                    >
+                      Download PDF
                     </Button>
                     <Button
                       variant="outline"
@@ -1430,11 +1496,23 @@ export function InventoryScreen() {
                   <h2 className="mb-3 font-display text-lg font-bold">
                     Suppliers
                   </h2>
-                  {suppliers.length === 0 ? (
-                    <EmptyState title="No suppliers yet" />
+                  <SearchField
+                    value={supplierQuery}
+                    onChange={setSupplierQuery}
+                    placeholder="Search suppliers"
+                    className="mb-3"
+                  />
+                  {filteredSuppliers.length === 0 ? (
+                    <EmptyState
+                      title={
+                        supplierQuery.trim()
+                          ? 'No matching suppliers'
+                          : 'No suppliers yet'
+                      }
+                    />
                   ) : (
                     <ul className="divide-y divide-[#E0D5C4]">
-                      {suppliers.map((s) => (
+                      {filteredSuppliers.map((s) => (
                         <li
                           key={s.id}
                           className="flex flex-wrap items-start justify-between gap-2 py-3 text-sm"

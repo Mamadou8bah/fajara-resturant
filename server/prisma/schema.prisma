@@ -166,6 +166,7 @@ model Employee {
   createdExceptions   OrderException[]       @relation("ExceptionActor")
   transactions        Transaction[]          @relation("TransactionCashier")
   refunds             Refund[]
+  expenses            Expense[]
   idempotencyKeys     IdempotencyKey[]
   paymentCorrectionsActor    PaymentCorrection[] @relation("PaymentCorrectionActor")
   paymentCorrectionsApprover PaymentCorrection[] @relation("PaymentCorrectionApprover")
@@ -857,6 +858,22 @@ model PayrollRecord {
 
   @@index([employeeId, periodStart])
   @@map("payroll_records")
+}
+
+model Expense {
+  id        String   @id @default(uuid()) @db.Uuid
+  amount    Decimal  @db.Decimal(12, 2)
+  category  String
+  note      String?
+  spentAt   DateTime @map("spent_at")
+  actorId   String   @map("actor_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  actor Employee @relation(fields: [actorId], references: [id])
+
+  @@index([spentAt])
+  @@index([actorId])
+  @@map("expenses")
 }
 
 model ActivityLog {

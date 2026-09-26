@@ -218,16 +218,23 @@ export class AuthService {
         isActive: true,
         archivedAt: null,
       },
-      select: EMPLOYEE_PUBLIC_SELECT,
+      select: {
+        ...EMPLOYEE_PUBLIC_SELECT,
+        passwordHash: true,
+        pinHash: true,
+      },
     });
 
     if (!employee) {
       throw new UnauthorizedException('Employee not found or inactive');
     }
 
+    const { passwordHash, pinHash, ...publicFields } = employee;
     const role = employee.role as Role;
     return {
-      ...employee,
+      ...publicFields,
+      hasPassword: Boolean(passwordHash),
+      hasPin: Boolean(pinHash),
       sessionId: user.sessionId,
       permissions: await this.settings.permissionsForRole(role),
       defaultRoute: ROLE_DEFAULT_ROUTE[role],
@@ -419,6 +426,15 @@ export class AuthService {
       if (!ok) {
         throw new UnauthorizedException('Current password is incorrect');
       }
+      if (dto.currentPassword === dto.newPassword) {
+        throw new BadRequestException(
+          'New password must be different from the current password',
+        );
+      }
+    }
+
+    if (dto.newPassword.trim().length < 8) {
+      throw new BadRequestException('newPassword must be at least 8 characters');
     }
 
     await this.prisma.employee.update({
@@ -448,6 +464,8 @@ export class AuthService {
       designation: employee.designation,
       photoUrl: employee.photoUrl,
       isActive: employee.isActive,
+      hasPassword: Boolean(employee.passwordHash),
+      hasPin: Boolean(employee.pinHash),
     };
   }
 

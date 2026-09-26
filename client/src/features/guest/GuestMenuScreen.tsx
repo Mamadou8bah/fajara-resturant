@@ -181,6 +181,11 @@ export function GuestMenuScreen({
     showAllergens?: boolean;
     showTodayOnlyBadge?: boolean;
   }>({});
+  const [guestNotify, setGuestNotify] = useState({
+    guestPushOn: true,
+    guestAnnounceOn: true,
+  });
+  const [qtyBumpLine, setQtyBumpLine] = useState<GuestCartLine | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -211,6 +216,10 @@ export function GuestMenuScreen({
           logoUrl?: string;
         };
         menuSettings?: typeof menuSettings;
+        notifications?: {
+          guestPushOn?: boolean;
+          guestAnnounceOn?: boolean;
+        };
       }>('/settings/public', { public: true }).catch(() => null);
 
       setMenu(m);
@@ -219,6 +228,12 @@ export function GuestMenuScreen({
         token: m.token || token,
       });
       if (pub?.menuSettings) setMenuSettings(pub.menuSettings);
+      if (pub?.notifications) {
+        setGuestNotify({
+          guestPushOn: pub.notifications.guestPushOn !== false,
+          guestAnnounceOn: pub.notifications.guestAnnounceOn !== false,
+        });
+      }
       const trading = pub?.profile?.tradingName?.trim();
       const rest = pub?.restaurantName?.trim();
       setBrandName(trading || rest || 'Fajara Kitchen');
@@ -333,7 +348,7 @@ export function GuestMenuScreen({
       if (payload.name && payload.status) {
         setToast(`${payload.name}: ${payload.status}`);
       }
-      announceGuestOrderStatus(payload);
+      announceGuestOrderStatus(payload, guestNotify.guestAnnounceOn);
       patchItem(payload);
     };
 
@@ -343,6 +358,7 @@ export function GuestMenuScreen({
         : 'An item is unavailable';
       setToast(msg);
       announceEvent({
+        enabled: guestNotify.guestAnnounceOn,
         kind: 'default',
         text: payload.name
           ? `${payload.name} is unavailable and was removed from your order.`
@@ -359,6 +375,7 @@ export function GuestMenuScreen({
           setReceiptPrompt(r);
           setView('orders');
           announceEvent({
+            enabled: guestNotify.guestAnnounceOn,
             kind: 'default',
             text: 'Your bill is paid. You can download your receipt.',
           });
@@ -381,6 +398,7 @@ export function GuestMenuScreen({
       if (!forMe) return;
       setToast('Your bill is paid — thank you');
       announceEvent({
+        enabled: guestNotify.guestAnnounceOn,
         kind: 'default',
         text: 'Your bill is paid. You can download your receipt.',
       });
@@ -412,6 +430,7 @@ export function GuestMenuScreen({
     session?.guestId,
     token,
     load,
+    guestNotify.guestAnnounceOn,
   ]);
 
   useEffect(() => {
@@ -565,7 +584,7 @@ export function GuestMenuScreen({
   }
 
   const specialsBlock =
-    filteredSpecials.length > 0 ? (
+    categoryId === 'all' && filteredSpecials.length > 0 ? (
       <section key="specials">
         <h2 className="mb-3 flex items-center gap-2 font-display text-xl font-bold">
           <IconStar className="h-5 w-5 text-warn" />
@@ -611,6 +630,7 @@ export function GuestMenuScreen({
         value={menuQuery}
         onChange={setMenuQuery}
         placeholder="Search the menu"
+        collapsible
       />
       <FilterChips
         value={categoryId}
@@ -756,6 +776,29 @@ export function GuestMenuScreen({
       if (next <= 0) return c.filter((l) => l.key !== key);
       return c.map((l) => (l.key === key ? { ...l, quantity: next } : l));
     });
+  }
+
+  function requestBumpQty(line: GuestCartLine) {
+    if (line.modifierOptionIds.length > 0) {
+      setQtyBumpLine(line);
+      return;
+    }
+    setQty(line.key, line.quantity + 1);
+  }
+
+  function confirmBumpSame() {
+    if (!qtyBumpLine) return;
+    setQty(qtyBumpLine.key, qtyBumpLine.quantity + 1);
+    setQtyBumpLine(null);
+  }
+
+  function confirmBumpDifferent() {
+    if (!qtyBumpLine || !menu) return;
+    const item = menu.categories
+      .flatMap((c) => c.menuItems)
+      .find((i) => i.id === qtyBumpLine.menuItemId);
+    setQtyBumpLine(null);
+    if (item) openItem(item);
   }
 
   async function onSubmitOrder() {
@@ -1025,7 +1068,7 @@ export function GuestMenuScreen({
                 <button
                   type="button"
                   className="flex h-9 w-9 items-center justify-center rounded-full bg-cta font-bold text-cream"
-                  onClick={() => setQty(line.key, line.quantity + 1)}
+                  onClick={() => requestBumpQty(line)}
                 >
                   +
                 </button>
@@ -1247,7 +1290,7 @@ export function GuestMenuScreen({
           {toast}
         </p>
       ) : null}
-      {session?.guestId && session.deviceToken ? (
+      {session?.guestId && session.deviceToken && guestNotify.guestPushOn ? (
         <PushOptInBanner
           audience={{
             kind: 'guest',
@@ -1355,7 +1398,7 @@ export function GuestMenuScreen({
                       <button
                         type="button"
                         className="flex h-11 w-11 items-center justify-center rounded-full bg-cta text-lg font-bold text-cream"
-                        onClick={() => setQty(line.key, line.quantity + 1)}
+                        onClick={() => requestBumpQty(line)}
                         aria-label="Increase"
                       >
                         +
@@ -1527,6 +1570,7 @@ export function GuestMenuScreen({
               value={menuQuery}
               onChange={setMenuQuery}
               placeholder="Search dishes…"
+              collapsible
             />
             <FilterChips
               value={categoryId}
@@ -1732,12 +1776,6 @@ export function GuestMenuScreen({
                   <span>Subtotal</span>
                   <span>{formatGmd(receiptPrompt.subtotal)}</span>
                 </div>
-                {Number(receiptPrompt.discountAmount) > 0 ? (
-                  <div className="flex justify-between">
-                    <span>Discount</span>
-                    <span>-{formatGmd(receiptPrompt.discountAmount)}</span>
-                  </div>
-                ) : null}
                 {Number(receiptPrompt.taxAmount) > 0 ? (
                   <div className="flex justify-between">
                     <span>{receiptPrompt.taxLabel ?? 'Tax'}</span>
@@ -1758,9 +1796,27 @@ export function GuestMenuScreen({
               {receiptPrompt.payments.length > 0 ? (
                 <ul className="space-y-1 border-t border-dashed border-[#E0D5C4] pt-3 text-xs">
                   {receiptPrompt.payments.map((p, i) => (
-                    <li key={`${p.method}-${i}`} className="flex justify-between gap-2">
-                      <span>{p.method}</span>
-                      <span className="tabular-nums">{formatGmd(p.amount)}</span>
+                    <li key={`${p.method}-${i}`} className="space-y-0.5">
+                      <div className="flex justify-between gap-2">
+                        <span>{p.method}</span>
+                        <span className="tabular-nums">{formatGmd(p.amount)}</span>
+                      </div>
+                      {p.cashReceived != null && Number(p.cashReceived) > 0 ? (
+                        <div className="flex justify-between gap-2 text-muted">
+                          <span>Expected</span>
+                          <span className="tabular-nums">
+                            {formatGmd(Number(p.cashReceived))}
+                          </span>
+                        </div>
+                      ) : null}
+                      {p.cashChange != null && Number(p.cashChange) > 0 ? (
+                        <div className="flex justify-between gap-2 font-semibold">
+                          <span>Change</span>
+                          <span className="tabular-nums">
+                            {formatGmd(Number(p.cashChange))}
+                          </span>
+                        </div>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -1805,6 +1861,40 @@ export function GuestMenuScreen({
                 }}
               >
                 {receiptDownloadBusy ? 'Saving…' : 'Download PNG'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {qtyBumpLine ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#271A11]/55 p-0 md:items-center md:p-4">
+          <button
+            type="button"
+            className="absolute inset-0"
+            aria-label="Close"
+            onClick={() => setQtyBumpLine(null)}
+          />
+          <div className="safe-pb relative z-10 w-full max-w-md rounded-t-3xl bg-cream p-4 shadow-lg md:rounded-3xl">
+            <p className="font-display text-lg font-bold text-ink">
+              Same as previous?
+            </p>
+            <p className="mt-1 text-sm text-muted">
+              {qtyBumpLine.name}
+              {qtyBumpLine.modifierLabels.length
+                ? ` · ${qtyBumpLine.modifierLabels.join(', ')}`
+                : ''}
+            </p>
+            <div className="mt-4 flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={confirmBumpDifferent}
+              >
+                Different
+              </Button>
+              <Button className="flex-1" onClick={confirmBumpSame}>
+                Same
               </Button>
             </div>
           </div>

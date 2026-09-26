@@ -52,6 +52,10 @@ export type NotificationsSettings = {
   payDateDays: number;
   soundOn: boolean;
   soundStyle: string;
+  /** Guest: allow browser push opt-in banner. */
+  guestPushOn: boolean;
+  /** Guest: speak/chime status updates (toast always shown). */
+  guestAnnounceOn: boolean;
 };
 
 export type MenuSettings = {
@@ -173,6 +177,8 @@ export const DEFAULT_NOTIFICATIONS: NotificationsSettings = {
   payDateDays: 3,
   soundOn: true,
   soundStyle: 'Chime',
+  guestPushOn: true,
+  guestAnnounceOn: true,
 };
 
 export const DEFAULT_MENU: MenuSettings = {

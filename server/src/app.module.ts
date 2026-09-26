@@ -11,6 +11,7 @@ import { PermissionsGuard } from './common/guards/permissions.guard';
 import { ClientRequestIdInterceptor } from './common/idempotency/client-request-id.interceptor';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { EmployeesModule } from './employees/employees.module';
+import { ExpensesModule } from './expenses/expenses.module';
 import { GuestModule } from './guest/guest.module';
 import { HealthModule } from './health/health.module';
 import { InventoryModule } from './inventory/inventory.module';
@@ -75,6 +76,7 @@ import { UploadsModule } from './uploads/uploads.module';
     RecipesModule,
     SuppliersModule,
     ShiftsModule,
+    ExpensesModule,
     PayrollModule,
     ReportsModule,
     RetentionModule,

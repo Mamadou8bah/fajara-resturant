@@ -283,6 +283,7 @@ export function IconSales(props: IconProps) {
 const BY_HREF: Record<string, (props: IconProps) => ReactElement> = {
   '/app/dashboard': IconHome,
   '/app/orders': IconOrders,
+  '/app/calls': IconBell,
   '/app/kitchen': IconKitchen,
   '/app/floor': IconFloor,
   '/app/checkout': IconCheckout,
@@ -290,6 +291,8 @@ const BY_HREF: Record<string, (props: IconProps) => ReactElement> = {
   '/app/menu': IconMenu,
   '/app/inventory': IconInventory,
   '/app/employees': IconEmployees,
+  '/app/expenses': IconSales,
+  '/app/refunds': IconCheckout,
   '/app/shifts': IconShifts,
   '/app/reports': IconReports,
   '/app/activity': IconActivity,

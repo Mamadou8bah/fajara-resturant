@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
   ResponsiveContainer,
   Tooltip,
@@ -20,7 +22,6 @@ import {
   LoadingBlock,
   Panel,
 } from '@/components/ui';
-import { Can } from '@/lib/rbac';
 import {
   DATE_RANGE_PRESETS,
   dateRangeForPreset,
@@ -29,45 +30,12 @@ import {
   type DateRangePresetId,
 } from '@/lib/money';
 import { useStaffRealtimeRefresh } from '@/lib/useStaffRealtimeRefresh';
-import { NavIcon } from '@/components/NavIcons';
 import {
   fetchDashboard,
   fetchSalesTrend,
   type DashboardData,
   type SalesTrend,
 } from './api';
-
-const QUICK: {
-  href: string;
-  label: string;
-  hint: string;
-  anyOf: ('orders.waiter' | 'orders.kitchen' | 'checkout.operate' | 'dashboard.view')[];
-}[] = [
-  {
-    href: '/app/orders',
-    label: 'Orders',
-    hint: 'Take and serve',
-    anyOf: ['orders.waiter'],
-  },
-  {
-    href: '/app/kitchen',
-    label: 'Kitchen',
-    hint: 'Cook tickets',
-    anyOf: ['orders.kitchen'],
-  },
-  {
-    href: '/app/floor',
-    label: 'Floor',
-    hint: 'Tables & seating',
-    anyOf: ['orders.waiter'],
-  },
-  {
-    href: '/app/checkout',
-    label: 'Checkout',
-    hint: 'Settle bills',
-    anyOf: ['checkout.operate'],
-  },
-];
 
 export function DashboardScreen() {
   const [from, setFrom] = useState(todayIso());
@@ -122,6 +90,16 @@ export function DashboardScreen() {
     [data],
   );
 
+  const topDishesChart = useMemo(
+    () =>
+      (data?.topDishes ?? []).slice(0, 5).map((d) => ({
+        name: d.name.length > 14 ? `${d.name.slice(0, 13)}…` : d.name,
+        fullName: d.name,
+        qty: d.qty,
+      })),
+    [data],
+  );
+
   const pipelineTotal = useMemo(
     () =>
       Object.values(data?.pipeline ?? {}).reduce((s, n) => s + n, 0) || 1,
@@ -129,37 +107,10 @@ export function DashboardScreen() {
   );
 
   return (
-    <StaffShell
-      title="Dashboard"
-      actions={
-        <>
-          <input
-            type="date"
-            className="input-field h-10 min-h-0 min-w-0 w-[9.5rem] shrink-0 text-sm sm:w-[10.5rem]"
-            value={from}
-            onChange={(e) => {
-              setPreset('custom');
-              setFrom(e.target.value);
-            }}
-          />
-          <input
-            type="date"
-            className="input-field h-10 min-h-0 min-w-0 w-[9.5rem] shrink-0 text-sm sm:w-[10.5rem]"
-            value={to}
-            onChange={(e) => {
-              setPreset('custom');
-              setTo(e.target.value);
-            }}
-          />
-          <Button className="h-10 min-h-0 shrink-0 px-4" onClick={() => load(from, to)}>
-            Apply
-          </Button>
-        </>
-      }
-    >
+    <StaffShell title="Dashboard">
       {error ? <ErrorBanner message={error} onClose={() => setError(null)} /> : null}
 
-      <div className="mb-4 chip-scroll">
+      <div className="mb-4 chip-scroll items-center gap-2">
         {DATE_RANGE_PRESETS.map((p) => {
           const active = preset === p.id;
           return (
@@ -177,29 +128,36 @@ export function DashboardScreen() {
             </button>
           );
         })}
+        <input
+          type="date"
+          className="input-field h-10 min-h-0 min-w-0 w-[9.5rem] shrink-0 text-sm sm:w-[10.5rem]"
+          value={from}
+          onChange={(e) => {
+            setPreset('custom');
+            setFrom(e.target.value);
+          }}
+        />
+        <input
+          type="date"
+          className="input-field h-10 min-h-0 min-w-0 w-[9.5rem] shrink-0 text-sm sm:w-[10.5rem]"
+          value={to}
+          onChange={(e) => {
+            setPreset('custom');
+            setTo(e.target.value);
+          }}
+        />
+        <Button
+          className="h-10 min-h-0 shrink-0 px-4"
+          onClick={() => load(from, to)}
+        >
+          Apply
+        </Button>
       </div>
 
       {loading || !data ? (
         <LoadingBlock label="Loading dashboard…" />
       ) : (
         <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-            {QUICK.map((q) => (
-              <Can key={q.href} anyOf={q.anyOf} fallback={null}>
-                <Link
-                  href={q.href}
-                  className="flex min-h-[72px] flex-col justify-center gap-1 rounded-2xl border border-[#E0D5C4] bg-white px-3 py-3 active:scale-[0.98]"
-                >
-                  <span className="flex items-center gap-2 font-semibold text-ink">
-                    <NavIcon href={q.href} className="h-5 w-5 text-cta" />
-                    {q.label}
-                  </span>
-                  <span className="text-xs text-muted">{q.hint}</span>
-                </Link>
-              </Can>
-            ))}
-          </div>
-
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <KpiCard
               label="Total revenue"
@@ -280,14 +238,6 @@ export function DashboardScreen() {
                   ))
                 )}
               </ul>
-              <div className="mt-5 grid grid-cols-2 gap-2 text-center text-xs">
-                <div className="rounded-xl bg-[#E4F0EB] p-2 text-ready">
-                  Free {data.occupancy.free}
-                </div>
-                <div className="rounded-xl bg-[#F7EDD4] p-2 text-warn">
-                  Cleaning {data.occupancy.needsCleaning}
-                </div>
-              </div>
             </Panel>
           </div>
 
@@ -296,22 +246,41 @@ export function DashboardScreen() {
               <h2 className="mb-3 font-display text-lg font-bold">
                 Top dishes
               </h2>
-              {data.topDishes.length === 0 ? (
+              {topDishesChart.length === 0 ? (
                 <EmptyState title="No sales yet" />
               ) : (
-                <ol className="space-y-3">
-                  {data.topDishes.slice(0, 5).map((d, i) => (
-                    <li key={d.name} className="flex items-center gap-3">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3D9CE] text-sm font-bold text-cta">
-                        {i + 1}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold">{d.name}</p>
-                        <p className="text-xs text-muted">{d.qty} sold</p>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
+                <div className="h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={topDishesChart}
+                      layout="vertical"
+                      margin={{ top: 4, right: 12, left: 4, bottom: 4 }}
+                    >
+                      <CartesianGrid stroke="#E0D5C4" horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        width={96}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <Tooltip
+                        formatter={(value) => [value, 'Qty']}
+                        labelFormatter={(_, payload) =>
+                          (payload?.[0]?.payload as { fullName?: string } | undefined)
+                            ?.fullName ?? ''
+                        }
+                      />
+                      <Bar
+                        dataKey="qty"
+                        name="Qty"
+                        fill="#C0613D"
+                        radius={[0, 8, 8, 0]}
+                        barSize={16}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               )}
             </Panel>
 

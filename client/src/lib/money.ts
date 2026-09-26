@@ -29,24 +29,11 @@ function utcToday(): Date {
   );
 }
 
-/** Monday-start week (UTC), matching server roster week. */
-function startOfUtcWeek(d: Date): Date {
-  const day = d.getUTCDay(); // 0 Sun … 6 Sat
-  const daysSinceMon = day === 0 ? 6 : day - 1;
-  const mon = new Date(d);
-  mon.setUTCDate(mon.getUTCDate() - daysSinceMon);
-  return mon;
-}
-
 export type DateRangePresetId =
   | 'today'
   | 'yesterday'
-  | 'this_week'
-  | 'last_week'
-  | 'this_month'
-  | 'last_month'
   | 'last_7'
-  | 'last_30';
+  | 'this_month';
 
 export const DATE_RANGE_PRESETS: {
   id: DateRangePresetId;
@@ -54,12 +41,8 @@ export const DATE_RANGE_PRESETS: {
 }[] = [
   { id: 'today', label: 'Today' },
   { id: 'yesterday', label: 'Yesterday' },
-  { id: 'this_week', label: 'This week' },
-  { id: 'last_week', label: 'Last week' },
-  { id: 'this_month', label: 'This month' },
-  { id: 'last_month', label: 'Last month' },
   { id: 'last_7', label: 'Last 7 days' },
-  { id: 'last_30', label: 'Last 30 days' },
+  { id: 'this_month', label: 'This month' },
 ];
 
 /** Inclusive from/to ISO dates for dashboard & reports filters. */
@@ -78,32 +61,13 @@ export function dateRangeForPreset(
       yd.setUTCDate(yd.getUTCDate() - 1);
       return { from: isoUTC(yd), to: isoUTC(yd) };
     }
-    case 'this_week': {
-      const mon = startOfUtcWeek(today);
-      return { from: isoUTC(mon), to: isoUTC(today) };
-    }
-    case 'last_week': {
-      const thisMon = startOfUtcWeek(today);
-      const lastMon = new Date(thisMon);
-      lastMon.setUTCDate(lastMon.getUTCDate() - 7);
-      const lastSun = new Date(thisMon);
-      lastSun.setUTCDate(lastSun.getUTCDate() - 1);
-      return { from: isoUTC(lastMon), to: isoUTC(lastSun) };
-    }
     case 'this_month':
       return {
         from: isoUTC(new Date(Date.UTC(y, m, 1))),
         to: isoUTC(today),
       };
-    case 'last_month': {
-      const start = new Date(Date.UTC(y, m - 1, 1));
-      const end = new Date(Date.UTC(y, m, 0));
-      return { from: isoUTC(start), to: isoUTC(end) };
-    }
     case 'last_7':
       return { from: daysAgoIso(6), to: todayIso() };
-    case 'last_30':
-      return { from: daysAgoIso(29), to: todayIso() };
   }
 }
 

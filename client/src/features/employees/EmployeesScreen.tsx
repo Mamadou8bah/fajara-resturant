@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { StaffShell } from '@/components/StaffShell';
 import {
   Button,
@@ -83,6 +84,7 @@ export function EmployeesScreen({
     email: '',
     employeeCode: '',
     pin: '',
+    password: '',
     designation: '',
     payStructure: '',
     baseAmount: '',
@@ -225,6 +227,10 @@ export function EmployeesScreen({
         await updateEmployee(editing.id, {
           ...base,
           ...(form.pin ? { pin: form.pin } : {}),
+          ...(form.password &&
+          (form.role === 'OWNER' || form.role === 'MANAGER')
+            ? { password: form.password }
+            : {}),
         });
         setFlash('Employee updated');
         setEditing(null);
@@ -234,7 +240,21 @@ export function EmployeesScreen({
             'Set an initial 4-digit PIN — they can change it later',
           );
         }
-        await createEmployee({ ...base, pin: form.pin });
+        if (
+          (form.role === 'OWNER' || form.role === 'MANAGER') &&
+          form.password &&
+          form.password.length < 8
+        ) {
+          throw new Error('Password must be at least 8 characters');
+        }
+        await createEmployee({
+          ...base,
+          pin: form.pin,
+          ...(form.password &&
+          (form.role === 'OWNER' || form.role === 'MANAGER')
+            ? { password: form.password }
+            : {}),
+        });
         setFlash('Employee added');
         setShowCreate(false);
       }
@@ -244,6 +264,7 @@ export function EmployeesScreen({
         email: '',
         employeeCode: '',
         pin: '',
+        password: '',
         designation: '',
         payStructure: '',
         baseAmount: '',
@@ -267,7 +288,6 @@ export function EmployeesScreen({
 
   const tabs: { id: Tab; label: string; anyOf?: ('employees.manage' | 'shifts.manage')[] }[] = [
     { id: 'staff', label: 'Staff', anyOf: ['employees.manage'] },
-    { id: 'shifts', label: 'Shifts', anyOf: ['shifts.manage'] },
     { id: 'payroll', label: 'Payroll', anyOf: ['employees.manage'] },
     { id: 'performance', label: 'Performance', anyOf: ['employees.manage'] },
   ];
@@ -283,21 +303,31 @@ export function EmployeesScreen({
       }
     >
       {initialTab !== 'shifts' ? (
-      <div className="mb-4 chip-scroll">
-        {tabs.map((t) => (
-          <Can key={t.id} anyOf={t.anyOf} fallback={null}>
-            <button
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={`min-h-touch shrink-0 rounded-xl px-3 py-2 text-sm font-semibold ${
-                tab === t.id ? 'bg-cta text-cream' : 'bg-[#EDE6DA] text-ink'
-              }`}
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="chip-scroll min-w-0 flex-1">
+            {tabs.map((t) => (
+              <Can key={t.id} anyOf={t.anyOf} fallback={null}>
+                <button
+                  type="button"
+                  onClick={() => setTab(t.id)}
+                  className={`min-h-touch shrink-0 rounded-xl px-3 py-2 text-sm font-semibold ${
+                    tab === t.id ? 'bg-cta text-cream' : 'bg-[#EDE6DA] text-ink'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              </Can>
+            ))}
+          </div>
+          <Can permission="shifts.manage" fallback={null}>
+            <Link
+              href="/app/shifts"
+              className="shrink-0 text-sm font-bold text-cta"
             >
-              {t.label}
-            </button>
+              Shift roster →
+            </Link>
           </Can>
-        ))}
-      </div>
+        </div>
       ) : (
         <p className="mb-4 text-sm text-muted">
           Tap a day to assign or clear a shift
@@ -342,6 +372,7 @@ export function EmployeesScreen({
                     email: '',
                     employeeCode: '',
                     pin: '',
+                    password: '',
                     designation: '',
                     payStructure: '',
                     baseAmount: '',
@@ -436,6 +467,24 @@ export function EmployeesScreen({
                     }
                   />
                 </label>
+                {form.role === 'OWNER' || form.role === 'MANAGER' ? (
+                  <label className="text-sm sm:col-span-2">
+                    {editing
+                      ? 'New password (optional)'
+                      : 'Password (optional, for email login)'}
+                    <input
+                      type="password"
+                      className="input-field mt-1"
+                      autoComplete="new-password"
+                      minLength={8}
+                      value={form.password}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, password: e.target.value }))
+                      }
+                      placeholder="At least 8 characters"
+                    />
+                  </label>
+                ) : null}
                 <label className="text-sm sm:col-span-2">
                   Designation
                   <input
@@ -507,6 +556,7 @@ export function EmployeesScreen({
                           email: '',
                           employeeCode: '',
                           pin: '',
+                          password: '',
                           designation: '',
                           payStructure: '',
                           baseAmount: '',
@@ -580,6 +630,7 @@ export function EmployeesScreen({
                             email: emp.email ?? '',
                             employeeCode: emp.employeeCode,
                             pin: '',
+                            password: '',
                             designation: emp.designation ?? '',
                             payStructure: emp.payStructure ?? '',
                             baseAmount:

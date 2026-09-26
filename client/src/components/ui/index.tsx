@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { SearchableSelect } from './SearchableSelect';
 
 export function Panel({
   children,
@@ -153,28 +154,88 @@ export function SearchField({
   placeholder = 'Search…',
   className = '',
   onSubmit,
+  collapsible = false,
+  defaultOpen,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
   onSubmit?: () => void;
+  /** When true, starts closed behind a magnifying-glass toggle. */
+  collapsible?: boolean;
+  defaultOpen?: boolean;
 }) {
+  const [open, setOpen] = useState(defaultOpen ?? !collapsible);
+
+  if (collapsible && !open) {
+    return (
+      <button
+        type="button"
+        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#D4C4B0] bg-white text-ink ${className}`}
+        aria-label={placeholder}
+        onClick={() => setOpen(true)}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          className="h-5 w-5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-3.5-3.5" strokeLinecap="round" />
+        </svg>
+      </button>
+    );
+  }
+
   return (
-    <input
-      type="search"
-      className={`input-field min-w-[160px] flex-1 ${className}`}
-      placeholder={placeholder}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' && onSubmit) {
-          e.preventDefault();
-          onSubmit();
-        }
-      }}
-      aria-label={placeholder}
-    />
+    <div className={`flex min-w-0 flex-1 items-center gap-2 ${className}`}>
+      {collapsible ? (
+        <button
+          type="button"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#D4C4B0] bg-white text-ink"
+          aria-label="Close search"
+          onClick={() => {
+            setOpen(false);
+            onChange('');
+          }}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-3.5-3.5" strokeLinecap="round" />
+          </svg>
+        </button>
+      ) : null}
+      <input
+        type="search"
+        className="input-field min-w-0 flex-1"
+        placeholder={placeholder}
+        value={value}
+        autoFocus={collapsible}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && onSubmit) {
+            e.preventDefault();
+            onSubmit();
+          }
+          if (e.key === 'Escape' && collapsible) {
+            setOpen(false);
+            onChange('');
+          }
+        }}
+        aria-label={placeholder}
+      />
+    </div>
   );
 }
 
@@ -224,18 +285,17 @@ export function FilterSelect({
   className?: string;
 }) {
   return (
-    <select
-      className={`input-field w-auto min-w-[140px] ${className}`}
+    <SearchableSelect
       value={value}
-      onChange={(e) => onChange(e.target.value)}
-      aria-label={placeholder ?? 'Filter'}
-    >
-      {placeholder ? <option value="">{placeholder}</option> : null}
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+      onChange={onChange}
+      options={options}
+      placeholder={placeholder ?? 'Filter'}
+      emptyOptionLabel={placeholder ?? 'All'}
+      allowEmpty={Boolean(placeholder)}
+      className={`min-w-[140px] ${className}`}
+    />
   );
 }
+
+export { SearchableSelect } from './SearchableSelect';
+

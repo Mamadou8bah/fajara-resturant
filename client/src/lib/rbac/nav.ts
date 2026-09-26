@@ -14,6 +14,11 @@ export const STAFF_NAV: NavItem[] = [
     anyOf: ['orders.waiter'],
   },
   {
+    href: '/app/calls',
+    label: 'Calls',
+    anyOf: ['orders.waiter'],
+  },
+  {
     href: '/app/kitchen',
     label: 'Kitchen',
     anyOf: ['orders.kitchen'],
@@ -45,9 +50,14 @@ export const STAFF_NAV: NavItem[] = [
     anyOf: ['employees.manage'],
   },
   {
-    href: '/app/shifts',
-    label: 'Shifts',
-    anyOf: ['shifts.manage'],
+    href: '/app/expenses',
+    label: 'Expenses',
+    anyOf: ['expenses.manage'],
+  },
+  {
+    href: '/app/refunds',
+    label: 'Refunds',
+    anyOf: ['refund.approve'],
   },
   {
     href: '/app/reports',
@@ -74,6 +84,7 @@ export const STAFF_NAV: NavItem[] = [
 export const ROUTE_PERMISSIONS: { prefix: string; anyOf: Permission[] }[] = [
   { prefix: '/app/dashboard', anyOf: ['dashboard.view'] },
   { prefix: '/app/orders', anyOf: ['orders.waiter'] },
+  { prefix: '/app/calls', anyOf: ['orders.waiter'] },
   { prefix: '/app/kitchen', anyOf: ['orders.kitchen'] },
   {
     prefix: '/app/floor',
@@ -81,6 +92,7 @@ export const ROUTE_PERMISSIONS: { prefix: string; anyOf: Permission[] }[] = [
   },
   { prefix: '/app/checkout', anyOf: ['checkout.operate'] },
   { prefix: '/app/sales', anyOf: ['sales_history.view'] },
+  { prefix: '/app/refunds', anyOf: ['refund.approve'] },
   { prefix: '/app/menu', anyOf: ['menu.manage'] },
   {
     prefix: '/app/inventory',
@@ -91,6 +103,7 @@ export const ROUTE_PERMISSIONS: { prefix: string; anyOf: Permission[] }[] = [
     anyOf: ['employees.manage', 'shifts.manage'],
   },
   { prefix: '/app/shifts', anyOf: ['shifts.manage'] },
+  { prefix: '/app/expenses', anyOf: ['expenses.manage'] },
   {
     prefix: '/app/reports',
     anyOf: ['reports.view', 'sales_history.view', 'activity_log.view'],

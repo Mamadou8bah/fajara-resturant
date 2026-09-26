@@ -27,6 +27,8 @@ export type StaffUser = {
   designation?: string | null;
   photoUrl?: string | null;
   sessionId?: string;
+  hasPassword?: boolean;
+  hasPin?: boolean;
   permissions: Permission[];
   defaultRoute: string;
 };
@@ -71,6 +73,8 @@ function normalizeUser(
     email?: string | null;
     designation?: string | null;
     photoUrl?: string | null;
+    hasPassword?: boolean;
+    hasPin?: boolean;
   },
   extras?: Partial<StaffUser>,
 ): StaffUser {
@@ -82,6 +86,8 @@ function normalizeUser(
     email: employee.email,
     designation: employee.designation,
     photoUrl: employee.photoUrl,
+    hasPassword: employee.hasPassword ?? extras?.hasPassword,
+    hasPin: employee.hasPin ?? extras?.hasPin,
     permissions: extras?.permissions ?? ROLE_PERMISSIONS[role],
     defaultRoute: extras?.defaultRoute ?? ROLE_DEFAULT_ROUTE[role],
     sessionId: extras?.sessionId,
@@ -138,6 +144,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       designation?: string | null;
       photoUrl?: string | null;
       sessionId?: string;
+      hasPassword?: boolean;
+      hasPin?: boolean;
       permissions: Permission[];
       defaultRoute: string;
     }>('/auth/me', { token: t });
@@ -146,6 +154,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       permissions: me.permissions,
       defaultRoute: me.defaultRoute,
       sessionId: me.sessionId,
+      hasPassword: me.hasPassword,
+      hasPin: me.hasPin,
     });
     setUser(u);
     saveCachedUser(u);
@@ -201,7 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         defaultRoute: string;
       }>('/auth/login/password', {
         public: true,
-        body: { email, password },
+        body: { email: email.trim().toLowerCase(), password },
       });
       return applySession(res.accessToken, res);
     },

@@ -17,6 +17,7 @@ export type Permission =
   | 'tables.manage'
   | 'employees.manage'
   | 'shifts.manage'
+  | 'expenses.manage'
   | 'roles.manage'
   | 'credentials.own'
   | 'checkout.operate'
@@ -41,6 +42,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   'tables.manage',
   'employees.manage',
   'shifts.manage',
+  'expenses.manage',
   'roles.manage',
   'credentials.own',
   'checkout.operate',
@@ -66,6 +68,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   'tables.manage': 'Manage tables and QR codes',
   'employees.manage': 'Manage staff accounts',
   'shifts.manage': 'Manage shifts and pay periods',
+  'expenses.manage': 'Record and manage expenses',
   'roles.manage': 'Change roles and permissions',
   'credentials.own': 'Change their own PIN or password',
   'checkout.operate': 'Take customer payments',
@@ -90,7 +93,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'session.move',
     'credentials.own',
     'orders.waiter',
-    'inventory.limited',
   ],
   KITCHEN: [
     'credentials.own',

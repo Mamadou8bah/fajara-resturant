@@ -177,8 +177,11 @@ const checks: Check[] = [
       assert.equal(roleHasPermission('WAITER', 'refund.approve'), false);
       assert.equal(roleHasPermission('CASHIER', 'menu.manage'), false);
       assert.equal(roleHasPermission('OWNER', 'refund.approve'), true);
-      assert.ok(ROLE_PERMISSIONS.WAITER.includes('inventory.limited'));
+      assert.equal(ROLE_PERMISSIONS.WAITER.includes('inventory.limited'), false);
       assert.ok(ROLE_PERMISSIONS.KITCHEN.includes('inventory.limited'));
+      assert.ok(ROLE_PERMISSIONS.OWNER.includes('expenses.manage'));
+      assert.ok(ROLE_PERMISSIONS.MANAGER.includes('expenses.manage'));
+      assert.equal(ROLE_PERMISSIONS.WAITER.includes('expenses.manage'), false);
     },
   },
   {

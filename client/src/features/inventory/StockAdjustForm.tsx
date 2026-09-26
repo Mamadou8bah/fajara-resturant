@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@/components/ui';
+import { Button, SearchableSelect } from '@/components/ui';
 import { Can } from '@/lib/rbac';
 import { n, type InventoryItem, type Supplier } from './api';
 
@@ -81,20 +81,16 @@ export function StockAdjustForm({
                 onChange={(e) => setReceiveUnit(e.target.value)}
               />
             </div>
-            <select
-              className="input-field w-full"
+            <SearchableSelect
+              className="w-full"
               value={receiveSupplierId}
-              onChange={(e) => setReceiveSupplierId(e.target.value)}
-            >
-              <option value="">Supplier (optional)</option>
-              {suppliers
+              onChange={setReceiveSupplierId}
+              placeholder="Supplier (optional)"
+              emptyOptionLabel="No supplier"
+              options={suppliers
                 .filter((s) => s.isActive)
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-            </select>
+                .map((s) => ({ value: s.id, label: s.name }))}
+            />
             <Button
               className="w-full"
               onClick={() => void onReceive()}

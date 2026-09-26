@@ -433,15 +433,20 @@ export function SettingsScreen() {
       setError('Password must be 8+ characters and match confirmation');
       return;
     }
+    if (user?.hasPassword && !pwForm.currentPassword.trim()) {
+      setError('Enter your current password');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       await changeOwnPassword({
-        currentPassword: pwForm.currentPassword || undefined,
+        currentPassword: pwForm.currentPassword.trim() || undefined,
         newPassword: pwForm.newPassword,
       });
       setPwForm({ currentPassword: '', newPassword: '', confirm: '' });
-      setSaved('Password updated');
+      setSaved(user?.hasPassword ? 'Password updated' : 'Password set');
+      await refreshMe();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Password update failed');
     } finally {
@@ -973,42 +978,6 @@ export function SettingsScreen() {
                     />
                   </Field>
                   <Toggle
-                    label="Allow discounts"
-                    checked={finance.allowDiscounts}
-                    disabled={readOnlyProfileFinance}
-                    onChange={(v) =>
-                      setFinance((f) => ({ ...f, allowDiscounts: v }))
-                    }
-                  />
-                  <Field label="Max discount %">
-                    <input
-                      type="number"
-                      className="input-field"
-                      disabled={readOnlyProfileFinance}
-                      value={finance.maxDiscountPct}
-                      onChange={(e) =>
-                        setFinance((f) => ({
-                          ...f,
-                          maxDiscountPct: Number(e.target.value),
-                        }))
-                      }
-                    />
-                  </Field>
-                  <Field label="Max discount amount (GMD)">
-                    <input
-                      type="number"
-                      className="input-field"
-                      disabled={readOnlyProfileFinance}
-                      value={finance.maxDiscountAmt}
-                      onChange={(e) =>
-                        setFinance((f) => ({
-                          ...f,
-                          maxDiscountAmt: Number(e.target.value),
-                        }))
-                      }
-                    />
-                  </Field>
-                  <Toggle
                     label="Tips enabled"
                     checked={finance.tipsEnabled}
                     disabled={readOnlyProfileFinance}
@@ -1249,6 +1218,8 @@ export function SettingsScreen() {
                       ['onLowStock', 'Low stock'],
                       ['onPayDate', 'Payroll pay-date reminder'],
                       ['soundOn', 'Play sound'],
+                      ['guestPushOn', 'Guest push opt-in'],
+                      ['guestAnnounceOn', 'Guest spoken announcements'],
                     ] as const
                   ).map(([key, label]) => (
                     <Toggle
@@ -2390,23 +2361,31 @@ export function SettingsScreen() {
                 {(user?.role === 'OWNER' || user?.role === 'MANAGER') && (
                   <>
                     <div className="mt-6 grid gap-3 border-t border-[#E0D5C4] pt-4 sm:grid-cols-2">
-                      <Field label="Current password">
-                        <input
-                          type="password"
-                          className="input-field"
-                          value={pwForm.currentPassword}
-                          onChange={(e) =>
-                            setPwForm((p) => ({
-                              ...p,
-                              currentPassword: e.target.value,
-                            }))
-                          }
-                        />
-                      </Field>
+                      {user?.hasPassword ? (
+                        <Field label="Current password">
+                          <input
+                            type="password"
+                            className="input-field"
+                            autoComplete="current-password"
+                            value={pwForm.currentPassword}
+                            onChange={(e) =>
+                              setPwForm((p) => ({
+                                ...p,
+                                currentPassword: e.target.value,
+                              }))
+                            }
+                          />
+                        </Field>
+                      ) : (
+                        <p className="sm:col-span-2 text-sm text-muted">
+                          No password yet — set one to sign in without a PIN.
+                        </p>
+                      )}
                       <Field label="New password">
                         <input
                           type="password"
                           className="input-field"
+                          autoComplete="new-password"
                           value={pwForm.newPassword}
                           onChange={(e) =>
                             setPwForm((p) => ({
@@ -2420,6 +2399,7 @@ export function SettingsScreen() {
                         <input
                           type="password"
                           className="input-field"
+                          autoComplete="new-password"
                           value={pwForm.confirm}
                           onChange={(e) =>
                             setPwForm((p) => ({
@@ -2436,7 +2416,7 @@ export function SettingsScreen() {
                       busyLabel="Updating…"
                       onClick={() => void onChangePassword()}
                     >
-                      Update password
+                      {user?.hasPassword ? 'Update password' : 'Set password'}
                     </Button>
                   </>
                 )}
@@ -2498,16 +2478,6 @@ export function SettingsScreen() {
                         label="Kitchen screens skip inactivity lock"
                         checked={kitchenNoLock}
                         onChange={setKitchenNoLock}
-                      />
-                      <Toggle
-                        label="Require PIN for discounts"
-                        checked={security.requirePinForDiscount}
-                        onChange={(v) =>
-                          setSecurity((s) => ({
-                            ...s,
-                            requirePinForDiscount: v,
-                          }))
-                        }
                       />
                     </div>
                     <SectionSave

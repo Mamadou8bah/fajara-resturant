@@ -201,43 +201,61 @@ function TicketCard({
             </p>
 
             <div className="mt-3 grid gap-2">
-              {next && nextLabel ? (
-                <Button
-                  className="min-h-14 w-full text-lg font-bold"
-                  disabled={busyId === item.id || busy}
-                  busy={busyId === item.id}
-                  busyLabel="Updating…"
-                  onClick={() => void onTransition(item, next)}
-                >
-                  {nextLabel}
-                </Button>
-              ) : (
-                <p className="rounded-xl bg-ready/10 px-3 py-3 text-center text-sm font-semibold text-ready">
-                  Waiting for waiter to serve
-                </p>
-              )}
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="outline"
-                  className="min-h-12"
-                  disabled={busyId === item.id || busy}
-                  onClick={() => void onUnavailable(item)}
-                >
-                  Gone
-                </Button>
-                {colKey !== 'submitted' ? (
+              {colKey === 'submitted' && next && nextLabel ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    className="min-h-14 text-lg font-bold"
+                    disabled={busyId === item.id || busy}
+                    busy={busyId === item.id}
+                    busyLabel="Updating…"
+                    onClick={() => void onTransition(item, next)}
+                  >
+                    {nextLabel}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="min-h-14"
+                    disabled={busyId === item.id || busy}
+                    onClick={() => void onUnavailable(item)}
+                  >
+                    Unavailable
+                  </Button>
+                </div>
+              ) : colKey === 'preparing' && next && nextLabel ? (
+                <>
+                  <Button
+                    className="min-h-14 w-full text-lg font-bold"
+                    disabled={busyId === item.id || busy}
+                    busy={busyId === item.id}
+                    busyLabel="Updating…"
+                    onClick={() => void onTransition(item, next)}
+                  >
+                    {nextLabel}
+                  </Button>
                   <Button
                     variant="danger"
-                    className="min-h-12"
+                    className="min-h-12 w-full"
                     disabled={busyId === item.id || busy}
                     onClick={() => void onRemake(item)}
                   >
                     Remake
                   </Button>
-                ) : (
-                  <span className="min-h-12" aria-hidden />
-                )}
-              </div>
+                </>
+              ) : (
+                <>
+                  <p className="rounded-xl bg-ready/10 px-3 py-3 text-center text-sm font-semibold text-ready">
+                    Waiting for waiter to serve
+                  </p>
+                  <Button
+                    variant="danger"
+                    className="min-h-12 w-full"
+                    disabled={busyId === item.id || busy}
+                    onClick={() => void onRemake(item)}
+                  >
+                    Remake
+                  </Button>
+                </>
+              )}
             </div>
           </li>
         ))}
@@ -724,11 +742,11 @@ export function KitchenScreen() {
 
       <ConfirmActionModal
         open={Boolean(goneConfirm)}
-        title={`Mark ${goneConfirm?.nameSnapshot ?? 'item'} as gone?`}
+        title={`Mark ${goneConfirm?.nameSnapshot ?? 'item'} as unavailable?`}
         description="This removes the item from the ticket and tells the guest it is unavailable."
         reasonLabel="Note (optional)"
         reasonDefault="Kitchen marked unavailable"
-        confirmLabel="Mark gone"
+        confirmLabel="Mark unavailable"
         danger
         busy={busyId === goneConfirm?.id}
         onCancel={() => setGoneConfirm(null)}

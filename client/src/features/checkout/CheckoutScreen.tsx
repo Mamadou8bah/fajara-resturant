@@ -19,6 +19,7 @@ import { formatDisplayDateTime, formatGmd, todayIso } from '@/lib/money';
 import { useStaffRealtimeRefresh } from '@/lib/useStaffRealtimeRefresh';
 import { isQueuedResult } from '@/lib/staffMutate';
 import { reopenPaidOrder } from '@/features/orders/api';
+import { removeGuest } from '@/features/floor/api';
 import {
   closeTill,
   fetchBillPreview,
@@ -48,7 +49,7 @@ import {
 
 type Tab = 'settle' | 'till' | 'history';
 
-const DISCOUNT_CHIPS = [0, 5, 10, 15] as const;
+const OPEN_TABLES_PAGE_SIZE = 8;
 
 function newClientRequestId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -172,12 +173,6 @@ function CheckoutReceiptView({
           <span>Subtotal</span>
           <span>{formatGmd(Number(receipt.subtotal))}</span>
         </div>
-        {Number(receipt.discountAmount) > 0 ? (
-          <div className="flex justify-between">
-            <span>Discount</span>
-            <span>-{formatGmd(Number(receipt.discountAmount))}</span>
-          </div>
-        ) : null}
         {Number(receipt.taxAmount) > 0 ? (
           <div className="flex justify-between">
             <span>{receipt.taxLabel ?? 'Tax'}</span>
@@ -197,16 +192,23 @@ function CheckoutReceiptView({
       </div>
       <ul className="mt-3 space-y-1 text-xs">
         {receipt.payments.map((p, i) => (
-          <li key={`${p.method}-${i}`}>
-            {p.method}: {formatGmd(Number(p.amount))}
-            {p.cashReceived != null && p.cashReceived !== ''
-              ? ` · received ${formatGmd(Number(p.cashReceived))}`
-              : ''}
-            {p.cashChange != null &&
-            p.cashChange !== '' &&
-            Number(p.cashChange) > 0
-              ? ` · change ${formatGmd(Number(p.cashChange))}`
-              : ''}
+          <li key={`${p.method}-${i}`} className="space-y-0.5">
+            <div className="flex justify-between gap-2">
+              <span>{p.method}</span>
+              <span>{formatGmd(Number(p.amount))}</span>
+            </div>
+            {p.cashReceived != null && p.cashReceived !== '' ? (
+              <div className="flex justify-between gap-2 text-muted">
+                <span>Expected</span>
+                <span>{formatGmd(Number(p.cashReceived))}</span>
+              </div>
+            ) : null}
+            {p.cashChange != null && p.cashChange !== '' ? (
+              <div className="flex justify-between gap-2 font-semibold">
+                <span>Change</span>
+                <span>{formatGmd(Number(p.cashChange))}</span>
+              </div>
+            ) : null}
           </li>
         ))}
       </ul>
@@ -240,19 +242,17 @@ export function CheckoutScreen() {
 
   const [floor, setFloor] = useState<FloorTable[]>([]);
   const [tableQuery, setTableQuery] = useState('');
+  const [floorPage, setFloorPage] = useState(0);
   const [methods, setMethods] = useState<string[]>(['Cash']);
   const [sessionId, setSessionId] = useState(
     searchParams.get('sessionId') ?? '',
   );
-  const [bill, setBill] = useState<BillPreview | null>(null);
+  const [fullBill, setFullBill] = useState<BillPreview | null>(null);
 
-  const [discountPct, setDiscountPct] = useState(0);
   const [tipPct, setTipPct] = useState<number | null>(null);
   const [tipCustom, setTipCustom] = useState('');
   const [tipOptions, setTipOptions] = useState<number[]>([5, 10, 15]);
   const [tipsEnabled, setTipsEnabled] = useState(true);
-  const [allowDiscounts, setAllowDiscounts] = useState(true);
-  const [maxDiscountPct, setMaxDiscountPct] = useState(10);
   const [taxRate, setTaxRate] = useState(0);
   const [taxLabel, setTaxLabel] = useState('VAT');
   const [taxInclusive, setTaxInclusive] = useState(false);
@@ -294,8 +294,6 @@ export function CheckoutScreen() {
   const canFloor = can('orders.waiter') || can('checkout.operate');
   const canHistory = can('sales_history.view');
   const canSeeAllSales = can('reports.view');
-  const canDiscount = can('discount.standard');
-  const canExceptional = can('discount.exceptional');
 
   const filteredFloor = useMemo(() => {
     const q = tableQuery.trim().toLowerCase();
@@ -313,28 +311,48 @@ export function CheckoutScreen() {
     });
   }, [floor, tableQuery]);
 
+  const floorPageCount = Math.max(
+    1,
+    Math.ceil(filteredFloor.length / OPEN_TABLES_PAGE_SIZE),
+  );
+  const pagedFloor = useMemo(() => {
+    const page = Math.min(floorPage, floorPageCount - 1);
+    const start = page * OPEN_TABLES_PAGE_SIZE;
+    return filteredFloor.slice(start, start + OPEN_TABLES_PAGE_SIZE);
+  }, [filteredFloor, floorPage, floorPageCount]);
+
+  useEffect(() => {
+    setFloorPage(0);
+  }, [tableQuery]);
+
+  /** Full unpaid bill once; guest chips filter lines client-side. */
+  const bill = useMemo(() => {
+    if (!fullBill) return null;
+    if (!settleGuestId) return fullBill;
+    const lines = fullBill.lines.filter((l) => l.guestId === settleGuestId);
+    const subtotal = round2(
+      lines.reduce((sum, l) => sum + num(l.lineTotal), 0),
+    );
+    return {
+      ...fullBill,
+      lines,
+      subtotal: String(subtotal),
+    };
+  }, [fullBill, settleGuestId]);
+
   const scopedSubtotal = useMemo(() => num(bill?.subtotal), [bill]);
 
   const live = useMemo(
     () =>
       calcLiveTotals({
         subtotal: scopedSubtotal,
-        discountPct: allowDiscounts ? discountPct : 0,
+        discountPct: 0,
         tipPct: tipsEnabled ? tipPct : null,
         tipAmount: tipsEnabled && tipPct == null ? Number(tipCustom) || 0 : 0,
         taxRatePercent: taxRate,
         taxInclusive,
       }),
-    [
-      scopedSubtotal,
-      discountPct,
-      tipPct,
-      tipCustom,
-      taxRate,
-      taxInclusive,
-      allowDiscounts,
-      tipsEnabled,
-    ],
+    [scopedSubtotal, tipPct, tipCustom, taxRate, taxInclusive, tipsEnabled],
   );
 
   const loadFloor = useCallback(async () => {
@@ -347,24 +365,21 @@ export function CheckoutScreen() {
     }
   }, [canFloor]);
 
-  const loadBill = useCallback(async (sid: string, guestId?: string | null) => {
+  const loadBill = useCallback(async (sid: string) => {
     if (!sid.trim()) {
-      setBill(null);
+      setFullBill(null);
       return;
     }
     try {
-      const preview = await fetchBillPreview(
-        sid.trim(),
-        guestId || undefined,
-      );
-      setBill(preview);
+      const preview = await fetchBillPreview(sid.trim());
+      setFullBill(preview);
       if (preview.tax) {
         setTaxRate(Number(preview.tax.ratePercent) || 0);
         setTaxLabel(preview.tax.label || 'VAT');
         setTaxInclusive(Boolean(preview.tax.inclusive));
       }
     } catch (e) {
-      setBill(null);
+      setFullBill(null);
       setError(e instanceof Error ? e.message : 'Failed to load bill');
     }
   }, []);
@@ -407,11 +422,9 @@ export function CheckoutScreen() {
     });
     void fetchPublicFinance().then((f) => {
       setTipsEnabled(f.tipsEnabled !== false);
-      setAllowDiscounts(f.allowDiscounts !== false);
       if (Array.isArray(f.tipOptions) && f.tipOptions.length) {
         setTipOptions(f.tipOptions);
       }
-      if (f.maxDiscountPct != null) setMaxDiscountPct(Number(f.maxDiscountPct));
       if (f.tax) {
         setTaxRate(Number(f.tax.ratePercent) || 0);
         setTaxLabel(f.tax.label || 'VAT');
@@ -428,16 +441,29 @@ export function CheckoutScreen() {
   }, [tab, loadHistory]);
 
   useEffect(() => {
-    if (sessionId) void loadBill(sessionId, settleGuestId);
-    else setBill(null);
-  }, [sessionId, settleGuestId, loadBill]);
+    if (sessionId) void loadBill(sessionId);
+    else setFullBill(null);
+  }, [sessionId, loadBill]);
 
   useStaffRealtimeRefresh(() => {
     void loadFloor();
     void loadTill();
-    if (sessionId) void loadBill(sessionId, settleGuestId);
+    if (sessionId) void loadBill(sessionId);
     if (tab === 'history') void loadHistory();
   });
+
+  function clearSessionSelection() {
+    setSessionId('');
+    setFullBill(null);
+    setReceipt(null);
+    setLastTxnId(null);
+    setTenders([]);
+    setCashReceived('');
+    setSettleGuestId(null);
+    setTipPct(null);
+    setTipCustom('');
+    setSplitMode(false);
+  }
 
   function selectSession(id: string) {
     setSessionId(id);
@@ -445,7 +471,6 @@ export function CheckoutScreen() {
     setTenders([]);
     setCashReceived('');
     setSettleGuestId(null);
-    setDiscountPct(0);
     setTipPct(null);
     setTipCustom('');
     setSplitMode(false);
@@ -482,7 +507,29 @@ export function CheckoutScreen() {
   }
 
   function printReceipt() {
+    const settledGuestId = receipt?.guestId ?? null;
+    const settledSessionId = receipt?.sessionId || sessionId;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      window.removeEventListener('afterprint', finish);
+      void (async () => {
+        if (settledGuestId && settledSessionId) {
+          try {
+            await removeGuest(settledSessionId, settledGuestId);
+          } catch {
+            /* guest may already have left */
+          }
+        }
+        clearSessionSelection();
+        await loadFloor();
+      })();
+    };
+    window.addEventListener('afterprint', finish);
     window.print();
+    // Fallback when afterprint does not fire (some mobile browsers).
+    window.setTimeout(finish, 1200);
   }
 
   async function onSettle(exact = true) {
@@ -518,33 +565,16 @@ export function CheckoutScreen() {
 
     setBusy(true);
     setError(null);
-    const discountAmount =
-      allowDiscounts && discountPct > 0 ? live.disc : undefined;
     const tipAmount = tipsEnabled && live.tip > 0 ? live.tip : undefined;
     const base = {
       sessionId: sessionId.trim(),
       guestId: settleGuestId || undefined,
       clientRequestId: newClientRequestId(),
-      discountAmount,
       tipAmount,
       payments,
     };
     try {
-      const txn = await settlePayment(base).catch(async (e: unknown) => {
-        const msg = e instanceof Error ? e.message : '';
-        if (!/cap|approval|PIN|exceptional/i.test(msg)) throw e;
-        const approval = await requestApproval({
-          title: 'Discount approval',
-          description: msg || 'Manager PIN required for this discount.',
-        });
-        if (!approval) throw e;
-        return settlePayment({
-          ...base,
-          clientRequestId: newClientRequestId(),
-          approverEmployeeId: approval.approverEmployeeId,
-          approverPin: approval.approverPin,
-        });
-      });
+      const txn = await settlePayment(base);
       const pending =
         isQueuedResult(txn) ||
         !('id' in txn) ||
@@ -555,7 +585,6 @@ export function CheckoutScreen() {
       if (pending) {
         setTenders([]);
         setCashReceived('');
-        setDiscountPct(0);
         setTipPct(null);
         setTipCustom('');
         setReceipt(null);
@@ -571,12 +600,11 @@ export function CheckoutScreen() {
       setLastTxnId(settled.id);
       setTenders([]);
       setCashReceived('');
-      setDiscountPct(0);
       setTipPct(null);
       setTipCustom('');
       await loadFloor();
       await loadTill();
-      await loadBill(sessionId, settleGuestId);
+      await loadBill(sessionId);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Settle failed');
     } finally {
@@ -895,44 +923,76 @@ export function CheckoutScreen() {
                     body="No open tables match."
                   />
                 ) : (
-                  <ul className="max-h-[40vh] space-y-2 overflow-auto md:max-h-[70vh]">
-                    {filteredFloor.map((t) => {
-                      const s = t.activeSession!;
-                      const due = Math.max(
-                        0,
-                        (s.settlement?.estimatedOrderTotal ?? 0) -
-                          (s.settlement?.transactionTotal ?? 0),
-                      );
-                      const active = s.id === sessionId;
-                      return (
-                        <li key={t.id}>
-                          <button
-                            type="button"
-                            onClick={() => selectSession(s.id)}
-                            className={`flex min-h-[64px] w-full flex-col rounded-xl border px-3 py-3 text-left transition active:scale-[0.99] ${
-                              active
-                                ? 'border-cta bg-[#F6E4DC]'
-                                : 'border-[#E0D5C4] bg-white hover:border-[#B8A48A]'
-                            }`}
-                          >
-                            <div className="flex justify-between gap-2">
-                              <span className="font-semibold">
-                                Table {t.number}
-                                {t.label ? ` · ${t.label}` : ''}
-                              </span>
-                              <span className="text-sm font-bold text-cta">
-                                {formatGmd(due)}
-                              </span>
-                            </div>
-                            <p className="mt-1 text-xs text-muted">
-                              {s.guestCount} guests · unpaid{' '}
-                              {s.settlement?.unpaidOrderCount ?? 0}
-                            </p>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <>
+                    <ul className="max-h-[40vh] space-y-2 overflow-auto md:max-h-[70vh]">
+                      {pagedFloor.map((t) => {
+                        const s = t.activeSession!;
+                        const due = Math.max(
+                          0,
+                          (s.settlement?.estimatedOrderTotal ?? 0) -
+                            (s.settlement?.transactionTotal ?? 0),
+                        );
+                        const active = s.id === sessionId;
+                        return (
+                          <li key={t.id}>
+                            <button
+                              type="button"
+                              onClick={() => selectSession(s.id)}
+                              className={`flex min-h-[64px] w-full flex-col rounded-xl border px-3 py-3 text-left transition active:scale-[0.99] ${
+                                active
+                                  ? 'border-cta bg-[#F6E4DC]'
+                                  : 'border-[#E0D5C4] bg-white hover:border-[#B8A48A]'
+                              }`}
+                            >
+                              <div className="flex justify-between gap-2">
+                                <span className="font-semibold">
+                                  Table {t.number}
+                                  {t.label ? ` · ${t.label}` : ''}
+                                </span>
+                                <span className="text-sm font-bold text-cta">
+                                  {formatGmd(due)}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-xs text-muted">
+                                {s.guestCount} guests · unpaid{' '}
+                                {s.settlement?.unpaidOrderCount ?? 0}
+                              </p>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {filteredFloor.length > OPEN_TABLES_PAGE_SIZE ? (
+                      <div className="mt-3 flex items-center justify-between gap-2">
+                        <Button
+                          variant="outline"
+                          className="text-xs"
+                          disabled={floorPage <= 0}
+                          onClick={() =>
+                            setFloorPage((p) => Math.max(0, p - 1))
+                          }
+                        >
+                          Prev
+                        </Button>
+                        <p className="text-xs text-muted">
+                          {Math.min(floorPage, floorPageCount - 1) + 1} /{' '}
+                          {floorPageCount}
+                        </p>
+                        <Button
+                          variant="outline"
+                          className="text-xs"
+                          disabled={floorPage >= floorPageCount - 1}
+                          onClick={() =>
+                            setFloorPage((p) =>
+                              Math.min(floorPageCount - 1, p + 1),
+                            )
+                          }
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    ) : null}
+                  </>
                 )}
               </>
             ) : (
@@ -980,7 +1040,7 @@ export function CheckoutScreen() {
                     </p>
                   </div>
 
-                  {bill.shares.length > 0 ? (
+                  {fullBill && fullBill.shares.length > 0 ? (
                     <div>
                       <p className="mb-2 text-xs font-semibold uppercase text-muted">
                         Settle
@@ -997,10 +1057,10 @@ export function CheckoutScreen() {
                         >
                           All guests
                           {!settleGuestId
-                            ? ` · ${formatGmd(num(bill.subtotal))}`
+                            ? ` · ${formatGmd(num(fullBill.subtotal))}`
                             : ''}
                         </button>
-                        {bill.shares.map((g) => (
+                        {fullBill.shares.map((g) => (
                           <button
                             key={g.id}
                             type="button"
@@ -1065,45 +1125,6 @@ export function CheckoutScreen() {
                     </div>
                   )}
 
-                  {allowDiscounts && canDiscount ? (
-                    <div>
-                      <p className="mb-2 text-xs font-semibold uppercase text-muted">
-                        Discount
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {DISCOUNT_CHIPS.map((pct) => {
-                          const locked =
-                            pct > maxDiscountPct && !canExceptional;
-                          return (
-                            <button
-                              key={pct}
-                              type="button"
-                              disabled={locked}
-                              onClick={() => {
-                                if (locked) {
-                                  setError(
-                                    `Discounts above ${maxDiscountPct}% need manager approval`,
-                                  );
-                                  return;
-                                }
-                                setDiscountPct(pct);
-                              }}
-                              className={`rounded-lg px-3 py-2 text-sm font-semibold ${
-                                discountPct === pct
-                                  ? 'bg-cta text-cream'
-                                  : locked
-                                    ? 'bg-[#EDE6DA] text-muted opacity-50'
-                                    : 'bg-[#EDE6DA] text-ink'
-                              }`}
-                            >
-                              {pct}%
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-
                   {tipsEnabled ? (
                     <div>
                       <p className="mb-2 text-xs font-semibold uppercase text-muted">
@@ -1150,14 +1171,6 @@ export function CheckoutScreen() {
                       <span className="text-muted">Subtotal</span>
                       <span>{formatGmd(scopedSubtotal)}</span>
                     </div>
-                    {live.disc > 0 ? (
-                      <div className="flex justify-between">
-                        <span className="text-muted">
-                          Discount ({discountPct}%)
-                        </span>
-                        <span>-{formatGmd(live.disc)}</span>
-                      </div>
-                    ) : null}
                     {live.tax > 0 ? (
                       <div className="flex justify-between">
                         <span className="text-muted">

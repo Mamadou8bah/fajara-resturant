@@ -24,9 +24,7 @@ import {
   cancelOrderItem,
   fetchAssignableWaiters,
   fetchMenuItems,
-  fetchNotifications,
   fetchWaiterTables,
-  firstAccept,
   newClientRequestId,
   optionPriceDelta,
   requestCompOrderItem,
@@ -35,7 +33,6 @@ import {
   serveOrderItem,
   submitOrder,
   type MenuItem,
-  type StaffNotification,
   type WaiterTableSession,
 } from './api';
 import { Can, useCan } from '@/lib/rbac';
@@ -80,7 +77,6 @@ export function OrdersScreen() {
   const { can } = useCan();
   const [sessions, setSessions] = useState<WaiterTableSession[]>([]);
   const [menu, setMenu] = useState<MenuItem[]>([]);
-  const [calls, setCalls] = useState<StaffNotification[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [guestId, setGuestId] = useState<string | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -110,26 +106,22 @@ export function OrdersScreen() {
     itemId: string;
     name: string;
   } | null>(null);
+  const [addGuestOpen, setAddGuestOpen] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [cancelConfirm, setCancelConfirm] = useState<{
+    itemId: string;
+    name: string;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [tables, items, notesList] = await Promise.all([
+      const [tables, items] = await Promise.all([
         fetchWaiterTables(),
         fetchMenuItems().catch(() => [] as MenuItem[]),
-        fetchNotifications().catch(() => [] as StaffNotification[]),
       ]);
       setSessions(tables);
       setMenu(items.filter((i) => i.isAvailable && !i.isSoldOut));
-      setCalls(
-        notesList.filter(
-          (n) =>
-            n.type === 'call_waiter' &&
-            ['created', 'delivered', 'seen'].includes(n.status) &&
-            !n.sessionWaiterId &&
-            (n.sessionStatus == null || n.sessionStatus === 'OPEN'),
-        ),
-      );
       setSessionId((prev) => {
         if (prev && tables.some((t) => t.id === prev)) return prev;
         return tables[0]?.id ?? null;
@@ -272,14 +264,13 @@ export function OrdersScreen() {
       setError(`Table is full (${seats} seats)`);
       return;
     }
-    const name =
-      window
-        .prompt(
-          'Name for this guest (optional).\nUse this for people without a phone — you’ll order on their behalf.',
-          '',
-        )
-        ?.trim() ?? null;
-    if (name === null) return;
+    setAddGuestOpen(true);
+  }
+
+  async function confirmAddGuest(nameRaw: string) {
+    if (!selected) return;
+    const name = nameRaw.trim();
+    setAddGuestOpen(false);
     setBusy(true);
     setError(null);
     try {
@@ -321,13 +312,12 @@ export function OrdersScreen() {
 
   async function onClearTable() {
     if (!selected || !canClearSelected) return;
-    if (
-      !window.confirm(
-        `Clear ${tableName(selected)}? Guests leave and the table is released.`,
-      )
-    ) {
-      return;
-    }
+    setClearConfirmOpen(true);
+  }
+
+  async function confirmClearTable() {
+    if (!selected || !canClearSelected) return;
+    setClearConfirmOpen(false);
     setBusy(true);
     setBusyKey('clear');
     setError(null);
@@ -489,12 +479,18 @@ export function OrdersScreen() {
   }
 
   async function onCancelItem(itemId: string, name: string) {
-    if (!window.confirm(`Cancel ${name} before kitchen starts?`)) return;
+    setCancelConfirm({ itemId, name });
+  }
+
+  async function confirmCancelItem() {
+    if (!cancelConfirm) return;
+    const { itemId, name } = cancelConfirm;
+    setCancelConfirm(null);
     setBusy(true);
     setError(null);
     try {
       await cancelOrderItem(itemId, 'Cancelled by waiter before preparation');
-      setFlash('Item cancelled');
+      setFlash(`${name} cancelled`);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Cancel failed');
@@ -533,25 +529,6 @@ export function OrdersScreen() {
       );
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function onAccept(n: StaffNotification) {
-    setBusy(true);
-    setBusyKey(`accept:${n.id}`);
-    setError(null);
-    try {
-      await firstAccept({
-        notificationId: n.id,
-        sessionId: n.sessionId ?? undefined,
-      });
-      setFlash('Call accepted — table assigned to you');
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Accept failed');
-    } finally {
-      setBusy(false);
-      setBusyKey(null);
     }
   }
 
@@ -844,53 +821,9 @@ export function OrdersScreen() {
       {loading ? (
         <LoadingBlock label="Loading…" />
       ) : (
-        <div
-          className={`md:grid md:grid-cols-[minmax(0,1fr)_minmax(300px,380px)] md:items-start md:gap-5 ${
-            cartCount > 0 ? 'pb-28 md:pb-0' : ''
-          }`}
-        >
+        <div className="pb-28 md:grid md:grid-cols-[minmax(0,1fr)_minmax(300px,380px)] md:items-start md:gap-5 md:pb-0">
           <div className="space-y-5">
-          {/* 1. Calls first */}
-          <section>
-            <div className="mb-2 flex items-baseline justify-between gap-2">
-              <h2 className="font-display text-lg font-bold">Calls</h2>
-              {calls.length > 0 ? (
-                <span className="rounded-full bg-cta px-2.5 py-0.5 text-xs font-bold text-cream">
-                  {calls.length}
-                </span>
-              ) : null}
-            </div>
-            {calls.length === 0 ? (
-              <p className="text-sm text-muted">No guest calls right now.</p>
-            ) : (
-              <ul className="space-y-2">
-                {calls.map((n) => (
-                  <li
-                    key={n.id}
-                    className="flex items-center justify-between gap-3 rounded-2xl border border-cta/40 bg-[#F6E4DC] px-3 py-3"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-semibold leading-snug">{n.title}</p>
-                      {n.body ? (
-                        <p className="text-sm text-muted">{n.body}</p>
-                      ) : null}
-                    </div>
-                    <Button
-                      className="shrink-0"
-                      disabled={busy}
-                      busy={busyKey === `accept:${n.id}`}
-                      busyLabel="Accepting…"
-                      onClick={() => void onAccept(n)}
-                    >
-                      Accept
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          {/* 2. Active orders — stay visible after send-to-kitchen */}
+          {/* Active orders — stay visible after send-to-kitchen */}
           <section>
             <h2 className="mb-2 font-display text-lg font-bold">
               Active orders
@@ -1163,7 +1096,7 @@ export function OrdersScreen() {
             {sessions.length === 0 ? (
               <EmptyState
                 title="No tables yet"
-                body="Accept a guest call or open a session on Floor."
+                body="Accept a guest call under Calls, or open a session on Floor."
               />
             ) : (
               <>
@@ -1568,6 +1501,44 @@ export function OrdersScreen() {
         busy={busy}
         onCancel={() => setExceptionConfirm(null)}
         onConfirm={(reason) => void submitExceptionRequest(reason)}
+      />
+
+      <ConfirmActionModal
+        open={addGuestOpen}
+        title="Add guest for ordering"
+        description="For guests without a phone — you’ll place orders on their behalf."
+        reasonLabel="Name (optional)"
+        reasonPlaceholder="Guest name"
+        confirmLabel="Add guest"
+        busy={busy}
+        onCancel={() => setAddGuestOpen(false)}
+        onConfirm={(name) => void confirmAddGuest(name)}
+      />
+
+      <ConfirmActionModal
+        open={clearConfirmOpen}
+        title={
+          selected
+            ? `Clear ${tableName(selected)}?`
+            : 'Clear this table?'
+        }
+        description="Guests leave and the table is released."
+        confirmLabel="Clear table"
+        danger
+        busy={busy && busyKey === 'clear'}
+        onCancel={() => setClearConfirmOpen(false)}
+        onConfirm={() => void confirmClearTable()}
+      />
+
+      <ConfirmActionModal
+        open={Boolean(cancelConfirm)}
+        title={`Cancel ${cancelConfirm?.name ?? 'item'}?`}
+        description="Only items that have not started in the kitchen can be cancelled."
+        confirmLabel="Cancel item"
+        danger
+        busy={busy}
+        onCancel={() => setCancelConfirm(null)}
+        onConfirm={() => void confirmCancelItem()}
       />
     </StaffShell>
   );

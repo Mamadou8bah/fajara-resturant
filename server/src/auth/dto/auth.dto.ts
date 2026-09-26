@@ -7,6 +7,10 @@ import {
   Matches,
   MinLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+
+const emptyToUndefined = ({ value }: { value: unknown }) =>
+  value === '' || value === null ? undefined : value;
 
 export class PinLoginDto {
   @IsEmail()
@@ -52,11 +56,12 @@ export class ChangePinDto {
 
 export class ChangePasswordDto {
   @IsOptional()
+  @Transform(emptyToUndefined)
   @IsString()
   @MinLength(1)
   currentPassword?: string;
 
   @IsString()
-  @MinLength(8)
+  @MinLength(8, { message: 'newPassword must be at least 8 characters' })
   newPassword!: string;
 }

@@ -399,64 +399,60 @@ export function ReportsScreen({
             : 'Reports'
       }
     >
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="mb-3 chip-scroll items-center gap-2">
         {tab !== 'eod' ? (
           <>
-            <div className="chip-scroll">
-              {DATE_RANGE_PRESETS.map((p) => {
-                const active = rangePreset === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={`shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                      active
-                        ? 'bg-cta text-cream'
-                        : 'bg-[#EDE6DA] text-ink'
-                    }`}
-                    onClick={() => applyRangePreset(p.id)}
-                  >
-                    {p.label}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <input
-                type="date"
-                className="input-field min-w-0 flex-1 sm:w-[10.5rem] sm:flex-none"
-                value={from}
-                onChange={(e) => {
-                  setRangePresetId('custom');
-                  setFrom(e.target.value);
-                }}
-              />
-              <input
-                type="date"
-                className="input-field min-w-0 flex-1 sm:w-[10.5rem] sm:flex-none"
-                value={to}
-                onChange={(e) => {
-                  setRangePresetId('custom');
-                  setTo(e.target.value);
-                }}
-              />
-              <Button className="shrink-0" onClick={() => void load()}>
-                Apply
-              </Button>
-            </div>
-          </>
-        ) : (
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            {DATE_RANGE_PRESETS.map((p) => {
+              const active = rangePreset === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                    active
+                      ? 'bg-cta text-cream'
+                      : 'bg-[#EDE6DA] text-ink'
+                  }`}
+                  onClick={() => applyRangePreset(p.id)}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
             <input
               type="date"
-              className="input-field min-w-0 flex-1 sm:w-[10.5rem] sm:flex-none"
+              className="input-field h-10 min-h-0 min-w-0 w-[9.5rem] shrink-0 text-sm sm:w-[10.5rem]"
+              value={from}
+              onChange={(e) => {
+                setRangePresetId('custom');
+                setFrom(e.target.value);
+              }}
+            />
+            <input
+              type="date"
+              className="input-field h-10 min-h-0 min-w-0 w-[9.5rem] shrink-0 text-sm sm:w-[10.5rem]"
+              value={to}
+              onChange={(e) => {
+                setRangePresetId('custom');
+                setTo(e.target.value);
+              }}
+            />
+            <Button className="h-10 min-h-0 shrink-0 px-4" onClick={() => void load()}>
+              Apply
+            </Button>
+          </>
+        ) : (
+          <>
+            <input
+              type="date"
+              className="input-field h-10 min-h-0 min-w-0 w-[9.5rem] shrink-0 text-sm sm:w-[10.5rem]"
               value={eodDate}
               onChange={(e) => setEodDate(e.target.value)}
             />
-            <Button className="shrink-0" onClick={() => void load()}>
+            <Button className="h-10 min-h-0 shrink-0 px-4" onClick={() => void load()}>
               Apply
             </Button>
-          </div>
+          </>
         )}
       </div>
 

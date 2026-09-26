@@ -77,6 +77,8 @@ const ACTIVITY_LABELS: Record<string, string> = {
   'shift.copy_week': 'Shifts copied from last week',
   'shift.remove': 'Shift removed',
   'supplier.create': 'Supplier added',
+  'expense.create': 'Expense recorded',
+  'expense.delete': 'Expense deleted',
   'supplier.update': 'Supplier updated',
   'table.archive': 'Table archived',
   'table.cleaning_complete': 'Table marked clean',

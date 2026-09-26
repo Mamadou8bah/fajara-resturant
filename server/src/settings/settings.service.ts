@@ -98,6 +98,8 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     payDateDays: 3,
     soundOn: true,
     soundStyle: 'Chime',
+    guestPushOn: true,
+    guestAnnounceOn: true,
   },
   menuSettings: {
     soldOutMode: 'show',

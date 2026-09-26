@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { NotificationStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { SettingsService } from '../settings/settings.service';
 import { PushService } from './push.service';
 
 /** Types that mean "claim this table" — only valid while the session has no waiter. */
@@ -13,6 +14,7 @@ export class NotificationsService {
     private readonly prisma: PrismaService,
     private readonly realtime: RealtimeGateway,
     private readonly push: PushService,
+    private readonly settings: SettingsService,
   ) {}
 
   async create(input: {
@@ -58,6 +60,11 @@ export class NotificationsService {
     url?: string;
     payload?: Record<string, unknown>;
   }) {
+    const notifications = await this.settings.get<{
+      guestPushOn?: boolean;
+    }>('notifications', { guestPushOn: true });
+    if (notifications?.guestPushOn === false) return;
+
     void this.push
       .notify(
         {
