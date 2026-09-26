@@ -54,6 +54,7 @@ const MOBILE_PRIORITY = [
   '/app/inventory',
   '/app/employees',
   '/app/expenses',
+  '/app/shifts',
   '/app/refunds',
   '/app/reports',
   '/app/activity',

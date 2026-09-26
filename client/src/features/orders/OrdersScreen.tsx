@@ -766,6 +766,7 @@ export function OrdersScreen() {
         onChange={setQuery}
         placeholder="Search menu…"
         className="mb-3"
+        collapsible
       />
       <div className="mb-3 grid max-h-[min(40vh,22rem)] gap-2 overflow-auto sm:grid-cols-2 md:grid-cols-1 xl:grid-cols-2">
         {filteredMenu.map((item) => (

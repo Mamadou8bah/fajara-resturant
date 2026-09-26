@@ -147,22 +147,22 @@ export function StockAdjustForm({
             Remove stock for waste, spoilage, or staff meals
           </p>
           <div className="space-y-2">
-            <select
-              className="input-field w-full"
+            <SearchableSelect
+              className="w-full"
               value={moveKind}
-              onChange={(e) =>
-                setMoveKind(e.target.value as typeof moveKind)
-              }
-            >
-              <option value="waste">Waste</option>
-              {canManage ? (
-                <>
-                  <option value="staff_meal">Staff meal</option>
-                  <option value="spoilage">Spoilage</option>
-                  <option value="return">Return to supplier</option>
-                </>
-              ) : null}
-            </select>
+              onChange={(v) => setMoveKind(v as typeof moveKind)}
+              allowEmpty={false}
+              options={[
+                { value: 'waste', label: 'Waste' },
+                ...(canManage
+                  ? [
+                      { value: 'staff_meal', label: 'Staff meal' },
+                      { value: 'spoilage', label: 'Spoilage' },
+                      { value: 'return', label: 'Return to supplier' },
+                    ]
+                  : []),
+              ]}
+            />
             <input
               type="number"
               min={0.001}

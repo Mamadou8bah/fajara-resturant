@@ -55,6 +55,11 @@ export const STAFF_NAV: NavItem[] = [
     anyOf: ['expenses.manage'],
   },
   {
+    href: '/app/shifts',
+    label: 'Shifts',
+    anyOf: ['shifts.manage'],
+  },
+  {
     href: '/app/refunds',
     label: 'Refunds',
     anyOf: ['refund.approve'],

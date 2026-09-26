@@ -10,6 +10,7 @@ import {
   LoadingBlock,
   Panel,
   SearchField,
+  SearchableSelect,
 } from '@/components/ui';
 import { Can, useCan } from '@/lib/rbac';
 import { matchesQuery } from '@/lib/search';
@@ -661,22 +662,21 @@ export function InventoryScreen() {
                           setNewItem((f) => ({ ...f, name: e.target.value }))
                         }
                       />
-                      <select
-                        className="input-field w-full"
+                      <SearchableSelect
+                        className="w-full"
                         value={newItem.type}
-                        onChange={(e) =>
+                        onChange={(v) =>
                           setNewItem((f) => ({
                             ...f,
-                            type: e.target.value as InventoryItemType,
+                            type: v as InventoryItemType,
                           }))
                         }
-                      >
-                        {ITEM_TYPES.map((t) => (
-                          <option key={t} value={t}>
-                            {TYPE_LABELS[t]}
-                          </option>
-                        ))}
-                      </select>
+                        allowEmpty={false}
+                        options={ITEM_TYPES.map((t) => ({
+                          value: t,
+                          label: TYPE_LABELS[t],
+                        }))}
+                      />
                       <input
                         className="input-field w-full"
                         placeholder="Unit (kg, L, pcs…)"
@@ -956,55 +956,53 @@ export function InventoryScreen() {
                     expected to log wastage variance.
                   </p>
                   <div className="space-y-2">
-                    <select
-                      className="w-full rounded-xl border border-[#D4C4B0] bg-white px-3 py-2.5 text-sm"
+                    <SearchableSelect
+                      className="w-full"
                       value={batchForm.recipeId}
-                      onChange={(e) =>
+                      onChange={(v) =>
                         setBatchForm((f) => ({
                           ...f,
-                          recipeId: e.target.value,
+                          recipeId: v,
                         }))
                       }
-                    >
-                      {recipes.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.name}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      className="w-full rounded-xl border border-[#D4C4B0] bg-white px-3 py-2.5 text-sm"
+                      placeholder="Select recipe"
+                      allowEmpty={false}
+                      options={recipes.map((r) => ({
+                        value: r.id,
+                        label: r.name,
+                      }))}
+                    />
+                    <SearchableSelect
+                      className="w-full"
                       value={batchForm.outputItemId}
-                      onChange={(e) =>
+                      onChange={(v) =>
                         setBatchForm((f) => ({
                           ...f,
-                          outputItemId: e.target.value,
+                          outputItemId: v,
                         }))
                       }
-                    >
-                      {stock.map((i) => (
-                        <option key={i.id} value={i.id}>
-                          Output: {i.name}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      className="w-full rounded-xl border border-[#D4C4B0] bg-white px-3 py-2.5 text-sm"
+                      placeholder="Output stock item"
+                      allowEmpty={false}
+                      options={stock.map((i) => ({
+                        value: i.id,
+                        label: `Output: ${i.name}`,
+                      }))}
+                    />
+                    <SearchableSelect
+                      className="w-full"
                       value={batchForm.batchSizeLabel}
-                      onChange={(e) =>
+                      onChange={(v) =>
                         setBatchForm((f) => ({
                           ...f,
-                          batchSizeLabel: e.target
-                            .value as (typeof BATCH_SIZES)[number],
+                          batchSizeLabel: v as (typeof BATCH_SIZES)[number],
                         }))
                       }
-                    >
-                      {BATCH_SIZES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
+                      allowEmpty={false}
+                      options={BATCH_SIZES.map((s) => ({
+                        value: s,
+                        label: s,
+                      }))}
+                    />
                     {batchForm.batchSizeLabel === 'Custom' ? (
                       <input
                         type="number"
@@ -1107,17 +1105,19 @@ export function InventoryScreen() {
                         setRecipeForm((f) => ({ ...f, name: e.target.value }))
                       }
                     />
-                    <select
-                      className="w-full rounded-xl border border-[#D4C4B0] bg-white px-3 py-2.5 text-sm"
+                    <SearchableSelect
+                      className="w-full"
                       value={recipeForm.kind}
-                      onChange={(e) =>
-                        setRecipeForm((f) => ({ ...f, kind: e.target.value }))
+                      onChange={(v) =>
+                        setRecipeForm((f) => ({ ...f, kind: v }))
                       }
-                    >
-                      <option value="production">production</option>
-                      <option value="dish">dish</option>
-                      <option value="component">component</option>
-                    </select>
+                      allowEmpty={false}
+                      options={[
+                        { value: 'production', label: 'production' },
+                        { value: 'dish', label: 'dish' },
+                        { value: 'component', label: 'component' },
+                      ]}
+                    />
                     <div className="grid grid-cols-2 gap-2">
                       <input
                         type="number"
@@ -1147,24 +1147,24 @@ export function InventoryScreen() {
                     <p className="text-xs font-semibold uppercase text-muted">
                       Add ingredient
                     </p>
-                    <select
-                      className="w-full rounded-xl border border-[#D4C4B0] bg-white px-3 py-2.5 text-sm"
+                    <SearchableSelect
+                      className="w-full"
                       value={recipeForm.ingredientId}
-                      onChange={(e) => {
-                        const item = stock.find((i) => i.id === e.target.value);
+                      onChange={(v) => {
+                        const item = stock.find((i) => i.id === v);
                         setRecipeForm((f) => ({
                           ...f,
-                          ingredientId: e.target.value,
+                          ingredientId: v,
                           ingredientUnit: item?.baseUnit ?? f.ingredientUnit,
                         }));
                       }}
-                    >
-                      {stock.map((i) => (
-                        <option key={i.id} value={i.id}>
-                          {i.name}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder="Select ingredient"
+                      allowEmpty={false}
+                      options={stock.map((i) => ({
+                        value: i.id,
+                        label: i.name,
+                      }))}
+                    />
                     <div className="grid grid-cols-2 gap-2">
                       <input
                         type="number"

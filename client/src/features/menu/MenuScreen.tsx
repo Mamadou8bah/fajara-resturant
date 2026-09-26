@@ -161,7 +161,7 @@ export function MenuScreen() {
     try {
       await createCategory({ name: catName.trim() });
       setCatName('');
-      await load();
+      await load({ quiet: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Create category failed');
     } finally {
@@ -271,7 +271,7 @@ export function MenuScreen() {
         specialPrice: '',
         quantityLimit: '',
       }));
-      await load();
+      await load({ quiet: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Create special failed');
     } finally {
@@ -310,7 +310,7 @@ export function MenuScreen() {
             : undefined,
       });
       setPromoForm((f) => ({ ...f, name: '', percentOff: '20', fixedPrice: '' }));
-      await load();
+      await load({ quiet: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Create promotion failed');
     } finally {
@@ -417,7 +417,7 @@ export function MenuScreen() {
                                   await updateCategory(c.id, {
                                     name: name.trim(),
                                   });
-                                  await load();
+                                  await load({ quiet: true });
                                 } catch (e) {
                                   setError(
                                     e instanceof Error
@@ -439,7 +439,7 @@ export function MenuScreen() {
                                 setBusy(true);
                                 try {
                                   await archiveCategory(c.id);
-                                  await load();
+                                  await load({ quiet: true });
                                 } catch (e) {
                                   setError(
                                     e instanceof Error
@@ -622,7 +622,7 @@ export function MenuScreen() {
                                       );
                                       setMobileFormOpen(false);
                                     }
-                                    await load();
+                                    await load({ quiet: true });
                                   } catch (e) {
                                     setError(
                                       e instanceof Error
@@ -790,7 +790,7 @@ export function MenuScreen() {
                                   emptyDishForm(categories[0]?.id ?? ''),
                                 );
                                 setMobileFormOpen(false);
-                                await load();
+                                await load({ quiet: true });
                               } catch (e) {
                                 setError(
                                   e instanceof Error
@@ -1041,7 +1041,7 @@ export function MenuScreen() {
                                           ? Number(price)
                                           : null,
                                       });
-                                      await load();
+                                      await load({ quiet: true });
                                     } catch (e) {
                                       setError(
                                         e instanceof Error
@@ -1063,7 +1063,7 @@ export function MenuScreen() {
                                     setBusy(true);
                                     try {
                                       await deactivateSpecial(s.id);
-                                      await load();
+                                      await load({ quiet: true });
                                     } catch (e) {
                                       setError(
                                         e instanceof Error
@@ -1237,7 +1237,7 @@ export function MenuScreen() {
                                 setBusy(true);
                                 try {
                                   await deactivatePromotion(p.id);
-                                  await load();
+                                  await load({ quiet: true });
                                 } catch (e) {
                                   setError(
                                     e instanceof Error
